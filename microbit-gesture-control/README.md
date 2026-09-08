@@ -1,113 +1,113 @@
-# Gestensteuerung: Webcam → micro:bit → micro:bit (Funk)
+# Gestensteuerung: Teachable Machine → micro:bit
 
-Zeig mit der Webcam am Mac nach links, rechts, oben oder unten – ein
-zweiter micro:bit zeigt dann per Funk den passenden Pfeil an!
+Trainiere dein eigenes KI-Modell mit [Teachable Machine](https://teachablemachine.withgoogle.com/)
+(z.B. "links zeigen", "rechts zeigen", ...) und lass einen micro:bit
+dazu einmalig den passenden Pfeil anzeigen.
 
 ## Wie funktioniert das?
 
 ```
-  Webcam (Mac)                micro:bit "Sender"        micro:bit "Empfänger"
-  ┌───────────────┐   USB     ┌─────────────────┐  Funk  ┌─────────────────┐
-  │ Python-Skript  │ ───────▶ │ liest Kommando   │ ─────▶ │ zeigt Pfeil an  │
-  │ erkennt Geste  │  Kabel   │ und funkt weiter │        │ auf LED-Matrix  │
-  └───────────────┘           └─────────────────┘        └─────────────────┘
+  Webcam (im Browser)              micro:bit
+  ┌──────────────────────┐   USB   ┌───────────────────┐
+  │ Teachable-Machine-    │ ──────▶ │ zeigt einmalig den │
+  │ Modell erkennt Geste  │  Kabel  │ passenden Pfeil an │
+  └──────────────────────┘         └───────────────────┘
 ```
 
-1. Das Python-Skript `webcam/gesture_control.py` erkennt über die Webcam,
-   in welche Richtung dein Zeigefinger zeigt.
-2. Es schickt einen Buchstaben (`L`, `R`, `U`, `D`) über das USB-Kabel an
-   den ersten micro:bit (den "Sender").
-3. Der Sender-micro:bit (`microbit/sender/main.py`) funkt diesen
-   Buchstaben an einen zweiten micro:bit weiter.
-4. Der Empfänger-micro:bit (`microbit/receiver/main.py`) zeigt den
-   passenden Pfeil auf seiner LED-Matrix an.
+1. Du trainierst im Browser auf teachablemachine.withgoogle.com ein
+   Bild-Modell, das deine Gesten unterscheiden kann (z.B. "links",
+   "rechts", "oben", "unten", "nichts").
+2. Die Seite `web/index.html` lädt dieses Modell, erkennt über die
+   Webcam laufend deine Geste und schickt bei einer stabilen Erkennung
+   **ein einzelnes Kommando** über die USB-Serielle-Verbindung
+   ([Web Serial API](https://developer.chrome.com/docs/capabilities/serial))
+   an den micro:bit.
+3. Der micro:bit (`microbit/main.py`) zeigt dazu einmalig das passende
+   Bild an.
 
-## Was du brauchst
+Es wird **kein Python** und **kein zweiter micro:bit** benötigt – alles
+läuft direkt im Browser.
 
-- 2× micro:bit (mit den neueren Modellen inkl. Funk/`radio`-Modul –
-  funktioniert mit allen micro:bit-Versionen)
-- 2× USB-Kabel (mindestens für den Sender-micro:bit während des Betriebs
-  nötig; für den Empfänger reicht danach auch eine Batteriehalterung)
-- Einen Mac mit Webcam
-- Python 3.9–3.12
+> Web Serial funktioniert nur in **Chrome** oder **Edge** (Chromium-Browser),
+> nicht in Safari oder Firefox.
 
-## Schritt 1: micro:bits programmieren
+## Schritt 1: Modell mit Teachable Machine trainieren
+
+1. Öffne [teachablemachine.withgoogle.com/train/image](https://teachablemachine.withgoogle.com/train/image).
+2. Lege für jede Geste eine eigene Klasse an, z.B.:
+   - `links` – nach links zeigen
+   - `rechts` – nach rechts zeigen
+   - `oben` – nach oben zeigen
+   - `unten` – nach unten zeigen
+   - `nichts` – keine Geste / leeres Bild
+3. Nimm pro Klasse mehrere Beispielbilder über die Webcam auf (Knopf
+   gedrückt halten), am besten aus leicht unterschiedlichen Positionen
+   und mit unterschiedlichem Hintergrund/Licht.
+4. Klicke auf **"Train Model"**.
+5. Nach dem Training: **"Export Model"** → Tab **"Tensorflow.js"** →
+   **"Upload my model"** → auf **Upload** klicken → den angezeigten
+   Link (z.B. `https://teachablemachine.withgoogle.com/models/AbC123xyz/`)
+   kopieren.
+
+> Tipp: Nutzt ihr andere Klassennamen als oben, müsst ihr sie in
+> `web/app.js` in `GESTURE_CONFIG` anpassen (siehe Schritt 3).
+
+## Schritt 2: micro:bit programmieren
 
 1. Öffne den [micro:bit Python-Editor](https://python.microbit.org) (oder
    die [Mu-Editor-App](https://codewith.mu)).
-2. Kopiere den Inhalt von `microbit/sender/main.py` hinein, verbinde den
-   **ersten** micro:bit per USB und lade das Programm hoch ("Flash" bzw.
-   "Send to micro:bit").
-3. Wiederhole das mit `microbit/receiver/main.py` für den **zweiten**
-   micro:bit.
-4. Beide micro:bits müssen dieselbe `RADIO_GROUP` haben (Standard: `1`).
-   Wenn ihr in der Klasse mehrere Teams seid, gebt jedem Team eine
-   eigene Gruppennummer (z.B. Team A = 1, Team B = 2, …), damit ihr euch
-   nicht gegenseitig stört!
+2. Kopiere den Inhalt von `microbit/main.py` hinein.
+3. Verbinde den micro:bit per USB und lade das Programm hoch ("Flash"
+   bzw. "Send to micro:bit").
 
-Danach zeigt jeder micro:bit ein lachendes Gesicht 🙂 – er ist bereit.
+Der micro:bit zeigt danach ein lachendes Gesicht 🙂 – er ist bereit.
 
-## Schritt 2: Python-Umgebung einrichten (am Mac)
+## Schritt 3: Webseite öffnen und verbinden
 
-```bash
-cd webcam
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+1. Öffne `web/index.html` in **Google Chrome** oder **Microsoft Edge**
+   (Doppelklick reicht, oder per `File → Open File...`).
+2. Füge den in Schritt 1 kopierten Modell-Link in das Textfeld ein und
+   klicke auf **"Modell laden"**. Erlaube der Seite den Kamerazugriff.
+3. Klicke auf **"micro:bit verbinden"** und wähle in der erscheinenden
+   Liste den micro:bit aus.
+4. Zeig eine deiner trainierten Gesten – sobald sie stabil erkannt
+   wird, zeigt der micro:bit einmalig den passenden Pfeil an.
 
-> Beim ersten Start fragt macOS nach Kamera-Zugriff für dein Terminal /
-> deine Python-App – das bitte erlauben (Systemeinstellungen →
-> Datenschutz & Sicherheit → Kamera).
+## Für Weiterentwicklung: Kommandos anpassen/erweitern
 
-## Schritt 3: Sender-micro:bit anschließen und Port finden
+Alle Zuordnungen zwischen Geste und Anzeige sind an **zwei zentralen
+Stellen** definiert – dort einfach neue Zeilen hinzufügen:
 
-Verbinde den **Sender**-micro:bit per USB mit dem Mac und finde seinen
-seriellen Port:
+- **`web/app.js`** → `GESTURE_CONFIG`: Teachable-Machine-Klassenname →
+  Kommando-Buchstabe, der an den micro:bit gesendet wird.
+- **`microbit/main.py`** → `COMMANDS`: Kommando-Buchstabe → Bild, das
+  der micro:bit anzeigt (z.B. `Image.ARROW_W` für den Pfeil nach links,
+  oder ein selbst gemaltes Icon mit `Image("...")`).
 
-```bash
-python gesture_control.py --list-ports
-```
+Wichtig: Der Kommando-Buchstabe muss an beiden Stellen **gleich**
+geschrieben sein.
 
-Das gibt z.B. `/dev/tty.usbmodem1102` aus.
+### Weitere Ideen
 
-## Schritt 4: Gestensteuerung starten
-
-```bash
-python gesture_control.py --port /dev/tty.usbmodem1102
-```
-
-Ein Kamerafenster öffnet sich. Halte deine Hand vor die Kamera und
-strecke den Zeigefinger deutlich in eine Richtung:
-
-- Nach **links** zeigen → Empfänger zeigt `⬅`
-- Nach **rechts** zeigen → Empfänger zeigt `➡`
-- Nach **oben** zeigen → Empfänger zeigt `⬆`
-- Nach **unten** zeigen → Empfänger zeigt `⬇`
-
-Mit `q` im Kamerafenster beendest du das Skript.
-
-Zum Ausprobieren ohne angeschlossenen micro:bit kannst du auch
-`python gesture_control.py --dry-run` verwenden – dann wird die Geste
-nur im Kamerabild angezeigt, aber nicht gesendet.
+- Eine zusätzliche Geste trainieren (z.B. Faust = "Stopp") und in
+  beiden Konfigurationen ein neues Kommando ergänzen.
+- Statt eines Pfeils eine kleine Animation anzeigen
+  (`display.show([Image1, Image2, ...], delay=100)`).
+- Den micro:bit einen Motor oder ein Rad steuern lassen, das sich je
+  nach erkannter Geste dreht.
 
 ## Troubleshooting
 
-- **"Webcam konnte nicht geöffnet werden"** → Kamera-Berechtigung für das
-  Terminal / die IDE in den macOS-Systemeinstellungen prüfen.
-- **Kein Port bei `--list-ports`** → USB-Kabel prüfen (manche Kabel können
-  nur laden, nicht Daten übertragen), micro:bit neu einstecken.
-- **Empfänger reagiert nicht** → `RADIO_GROUP` in beiden `main.py`-Dateien
-  vergleichen, sie müssen identisch sein.
-- **Geste wird nicht erkannt** → Für gute Erkennung auf helles Licht und
-  einen möglichst einfarbigen Hintergrund hinter der Hand achten, Hand
-  nah genug an die Kamera halten.
-
-## Weiterbauen (Ideen für Kids)
-
-- Statt Pfeilen eigene Bilder anzeigen (z.B. `Image.HAPPY` /
-  `Image.SAD`, oder ein selbst gemaltes Icon mit `Image("...")`).
-- Zusätzliche Gesten erkennen (z.B. Faust = Stopp) und ein fünftes
-  Kommando einbauen.
-- Den Empfänger-micro:bit einen kleinen Motor oder ein Rad steuern
-  lassen, das sich je nach Pfeilrichtung dreht.
+- **"micro:bit verbinden" zeigt keinen Port an** → USB-Kabel prüfen
+  (manche Kabel können nur laden, nicht Daten übertragen), micro:bit
+  neu einstecken.
+- **Web Serial funktioniert nicht** → Nur Chrome/Edge werden
+  unterstützt, Safari und Firefox können das (noch) nicht.
+- **Kamera startet nicht** → Kamera-Berechtigung für den Browser in den
+  macOS-Systemeinstellungen prüfen (Systemeinstellungen → Datenschutz &
+  Sicherheit → Kamera).
+- **Geste wird nicht/falsch erkannt** → Mehr und vielfältigere
+  Trainingsbilder pro Klasse in Teachable Machine aufnehmen, auf gutes
+  Licht achten, Modell neu trainieren.
+- **micro:bit reagiert gar nicht** → Prüfen, ob `microbit/main.py`
+  erfolgreich aufgespielt wurde (micro:bit sollte ein Smiley zeigen).

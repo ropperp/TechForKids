@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestensteuerung für micro:bit (Teachable Machine)</title>
+<style>
+  body {
+    font-family: sans-serif;
+    max-width: 640px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    color: #222;
+  }
+  h1 { font-size: 1.4rem; }
+  #controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  #modelUrl { flex: 1; min-width: 220px; padding: 0.4rem; }
+  button { padding: 0.5rem 0.8rem; cursor: pointer; }
+  #status { font-weight: bold; }
+  #webcam-container { margin: 1rem 0; }
+  #label-container div { padding: 2px 0; }
+</style>
+</head>
+<body>
+  <h1>Gestensteuerung für micro:bit (Teachable Machine)</h1>
+
+  <ol>
+    <li>Modell auf <a href="https://teachablemachine.withgoogle.com/train/image" target="_blank" rel="noopener">teachablemachine.withgoogle.com</a> trainieren und exportieren ("Export Model" → Tab "Tensorflow.js" → "Upload my model" → Link kopieren).</li>
+    <li>Link unten einfügen und auf "Modell laden" klicken.</li>
+    <li>micro:bit per USB anschließen (vorher mit microbit/main.py bespielt) und auf "micro:bit verbinden" klicken.</li>
+  </ol>
+
+  <div id="controls">
+    <input id="modelUrl" type="text" placeholder="https://teachablemachine.withgoogle.com/models/XXXXXXXXX/">
+    <button id="loadModelBtn">Modell laden</button>
+    <button id="connectBtn">micro:bit verbinden</button>
+  </div>
+
+  <p id="status">Status: Modell noch nicht geladen.</p>
+  <div id="webcam-container"></div>
+  <div id="label-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
