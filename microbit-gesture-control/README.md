@@ -108,7 +108,10 @@ geschrieben sein.
   Sicherheit → Kamera).
 - **Geste wird nicht/falsch erkannt** → Mehr und vielfältigere
   Trainingsbilder pro Klasse in Teachable Machine aufnehmen, auf gutes
-  Licht achten, Modell neu trainieren.
+  Licht achten, Modell neu trainieren. Die Webseite nimmt die Webcam
+  bewusst quadratisch auf (wie Teachable Machine selbst) – bei einem
+  rechteckigen Kamerabild würde die Erkennung durch Verzerrung deutlich
+  schlechter werden.
 - **micro:bit reagiert gar nicht** → Prüfen, ob `microbit/main.py`
   erfolgreich aufgespielt wurde (micro:bit sollte ein Smiley zeigen).
 - **Nach neuem Training ändert sich nichts** → Falls dein Teachable-

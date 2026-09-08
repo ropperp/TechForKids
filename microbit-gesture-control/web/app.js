@@ -83,7 +83,10 @@ async function loadModel() {
   }
   maxPredictions = model.getTotalClasses();
 
-  webcam = new tmImage.Webcam(320, 240, true); // Breite, Höhe, spiegeln
+  // Quadratisches Format (wie bei Teachable Machine selbst) verwenden!
+  // Ein rechteckiges Bild würde beim Umrechnen auf die quadratische
+  // Eingabegröße des Modells verzerrt und die Erkennung verschlechtern.
+  webcam = new tmImage.Webcam(224, 224, true); // Breite, Höhe, spiegeln
   await webcam.setup();
   await webcam.play();
   document.getElementById("webcam-container").innerHTML = "";
