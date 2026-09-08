@@ -49,12 +49,22 @@ async function loadModel() {
     alert("Bitte zuerst die Modell-URL aus Teachable Machine eintragen.");
     return;
   }
-  const modelURL = base.endsWith("/") ? base + "model.json" : base + "/model.json";
-  const metadataURL = base.endsWith("/") ? base + "metadata.json" : base + "/metadata.json";
+  const dir = base.endsWith("/") ? base : base + "/";
+  const modelURL = dir + "model.json";
+  // Zeitstempel anhängen, damit bei gleichbleibendem Link nach dem
+  // Neu-Trainieren wirklich die neuen metadata.json geladen werden und
+  // nicht eine im Browser zwischengespeicherte alte Version.
+  const metadataURL = dir + "metadata.json?v=" + Date.now();
 
   statusEl.textContent = "Status: Modell wird geladen ...";
   try {
-    model = await tmImage.load(modelURL, metadataURL);
+    // "cache: no-store" sorgt dafür, dass model.json und die
+    // zugehörigen weights.bin ebenfalls nicht aus dem Browser-Cache
+    // kommen, sondern nach jedem erneuten Training frisch geladen werden.
+    const modelSource = tf.io.browserHTTPRequest(modelURL, {
+      requestInit: { cache: "no-store" },
+    });
+    model = await tmImage.load(modelSource, metadataURL);
   } catch (err) {
     console.error(err);
     statusEl.textContent = "Status: Modell konnte nicht geladen werden. Link prüfen.";

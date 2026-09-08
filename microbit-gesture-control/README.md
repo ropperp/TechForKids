@@ -111,3 +111,8 @@ geschrieben sein.
   Licht achten, Modell neu trainieren.
 - **micro:bit reagiert gar nicht** → Prüfen, ob `microbit/main.py`
   erfolgreich aufgespielt wurde (micro:bit sollte ein Smiley zeigen).
+- **Nach neuem Training ändert sich nichts** → Falls dein Teachable-
+  Machine-Link nach dem Re-Upload gleich bleibt, holt die Seite sich
+  Modell und Metadaten inzwischen bewusst ohne Browser-Cache
+  (`cache: "no-store"` in `web/app.js`) – einfach erneut auf "Modell
+  laden" klicken, ein Neuladen der Seite ist nicht nötig.
