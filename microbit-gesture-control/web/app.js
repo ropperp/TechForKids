@@ -14,9 +14,11 @@
 
 // ---------------------------------------------------------------------
 // HIER ANPASSEN: Zuordnung Teachable-Machine-Klasse -> micro:bit-Kommando.
-// Die Klassennamen (links) müssen genau so heißen wie in Teachable
-// Machine! Für neue Gesten einfach eine weitere Zeile hinzufügen - der
-// Buchstabe (rechts) muss zu COMMANDS in microbit/main.py passen.
+// Groß-/Kleinschreibung und Leerzeichen werden ignoriert. Für neue
+// Gesten einfach eine weitere Zeile hinzufügen - der Buchstabe (rechts)
+// muss zu COMMANDS in microbit/main.py passen. Falls deine Klasse für
+// "keine Geste" anders heißt als hier gelistet, einfach eine weitere
+// Zeile mit deinem Namen -> "N" ergänzen.
 // ---------------------------------------------------------------------
 const GESTURE_CONFIG = {
   "links": "L",
@@ -24,7 +26,16 @@ const GESTURE_CONFIG = {
   "oben": "U",
   "unten": "D",
   "nichts": "N",
+  "mitte": "N",
+  "neutral": "N",
 };
+
+// Schlägt ein Kommando für eine Teachable-Machine-Klasse nach, dabei
+// werden Groß-/Kleinschreibung und Leerzeichen ignoriert.
+function lookupCommand(className) {
+  if (!className) return null;
+  return GESTURE_CONFIG[className.trim().toLowerCase()] || null;
+}
 
 const STABLE_FRAMES = 8; // so viele gleiche Vorhersagen hintereinander, bevor gesendet wird
 const PREDICTION_INTERVAL_MS = 200;
@@ -121,10 +132,15 @@ function handlePrediction(className) {
 
   if (candidateCount >= STABLE_FRAMES && candidate !== lastSent) {
     lastSent = candidate;
-    const command = GESTURE_CONFIG[candidate];
+    const command = lookupCommand(candidate);
     if (command) {
       sendCommand(command);
       statusEl.textContent = `Status: Geste "${candidate}" erkannt -> sende "${command}"`;
+    } else {
+      // Klasse erkannt, aber kein Eintrag in GESTURE_CONFIG dafür -
+      // sichtbar machen statt einfach nichts zu tun, damit man den
+      // exakten Klassennamen sieht und in web/app.js ergänzen kann.
+      statusEl.textContent = `Status: Geste "${candidate}" erkannt, aber kein Kommando dafür konfiguriert (GESTURE_CONFIG in web/app.js ergänzen).`;
     }
   }
 }

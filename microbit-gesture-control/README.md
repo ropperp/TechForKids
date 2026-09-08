@@ -116,3 +116,9 @@ geschrieben sein.
   Modell und Metadaten inzwischen bewusst ohne Browser-Cache
   (`cache: "no-store"` in `web/app.js`) – einfach erneut auf "Modell
   laden" klicken, ein Neuladen der Seite ist nicht nötig.
+- **Eine Geste wird erkannt, aber am micro:bit passiert nichts** → Der
+  Status-Text unter der Webcam zeigt jetzt an, wenn eine Klasse zwar
+  erkannt wurde, aber kein Kommando dafür konfiguriert ist (z.B. weil
+  deine Klasse in Teachable Machine anders heißt als `links`/`rechts`/
+  `oben`/`unten`/`nichts`). Den dort angezeigten Klassennamen einfach 1:1
+  in `GESTURE_CONFIG` in `web/app.js` ergänzen.
