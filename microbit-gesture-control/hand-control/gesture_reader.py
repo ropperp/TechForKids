@@ -2,25 +2,27 @@
 Handgesten-Erkennung -> micro:bit -> BitBot XL
 =================================================
 
-Erkennt per Webcam fünf Gesten und schickt sie als Kommando (Richtung +
-Geschwindigkeit) über die USB-Serielle-Verbindung an den
-"Sender"-micro:bit (siehe microbit-sender/main.py), der es per Funk an
-den micro:bit auf dem BitBot XL weiterleitet (siehe
+Erkennt per Webcam fünf Gesten und schickt sie als Fahrbefehl (Modus +
+Geschwindigkeit von linkem und rechtem Rad) über die USB-Serielle-
+Verbindung an den "Sender"-micro:bit (siehe microbit-sender/main.py),
+der es per Funk an den micro:bit auf dem BitBot XL weiterleitet (siehe
 microbit-bitbot/main.py):
 
-- Faust (0-1 Finger gestreckt)            -> STOPP      -> "S"
-- Zwei Finger gestreckt ("Peace-Zeichen")  -> RUECKWAERTS -> "B"
-- Offene Hand, nicht gekippt (neutral)     -> VORWAERTS   -> "V"
-- Offene Hand, nach links gekippt          -> LINKS       -> "L"
-- Offene Hand, nach rechts gekippt         -> RECHTS      -> "R"
+- Faust (0-1 Finger gestreckt)            -> STOPP       -> "S"
+- Zwei Finger gestreckt ("Peace-Zeichen")  -> RUECKWAERTS  -> "B"
+- Offene Hand, nicht gekippt (neutral)     -> VORWAERTS    -> "V"
+- Offene Hand, nach links gekippt          -> LINKS        -> "L"
+- Offene Hand, nach rechts gekippt         -> RECHTS       -> "R"
 - Keine Hand im Bild                       -> STOPP (Sicherheit!)
 
 Die "Kippung" wird über die Rotation der Hand gemessen (wie ein
 Lenkrad), nicht über die Position im Bild. Beim Lenken (LINKS/RECHTS)
-wird die Geschwindigkeit **proportional** zur Kippung gesendet: leicht
-gekippt -> langsame Drehung, stark gekippt -> schnelle Drehung.
+fährt der BitBot eine **Kurve** statt auf der Stelle zu drehen: das
+kurveninnere Rad wird proportional zur Kippung langsamer (leicht
+gekippt -> weiter Bogen, stark gekippt -> enge Kurve), das äußere Rad
+bleibt bei Vorwärtsgeschwindigkeit.
 
-Die Fahrgeschwindigkeiten (vorwärts/Lenken/rückwärts) werden beim Start
+Die Fahrgeschwindigkeiten (vorwärts/rückwärts/Kurve) werden beim Start
 abgefragt (Enter = Standardwert übernehmen), damit man sie nicht im
 Code ändern muss. Mit --no-prompt werden die Standardwerte direkt ohne
 Nachfrage verwendet.
@@ -65,15 +67,14 @@ except ImportError:
 FIST_MAX_EXTENDED = 1         # so viele gestreckte Finger gelten noch als Faust
 REVERSE_EXTENDED = 2          # so viele gestreckte Finger gelten als "Rückwärts"-Geste
 ROTATION_THRESHOLD_DEG = 20   # ab dieser Neigung (in Grad) gilt die Hand als "gekippt"
-MAX_TILT_ANGLE_DEG = 60       # ab dieser Neigung wird mit voller Geschwindigkeit gedreht
+MAX_TILT_ANGLE_DEG = 60       # ab dieser Neigung ist die Kurve am engsten
 STABLE_FRAMES = 3             # so viele Frames hintereinander für eine stabile Erkennung
 HEARTBEAT_INTERVAL_S = 0.3    # aktuelles Kommando spätestens alle X Sekunden erneut senden
 
 # Standard-Geschwindigkeiten (0-1023), können beim Start angepasst werden
 DEFAULT_FORWARD_SPEED = 600
 DEFAULT_REVERSE_SPEED = 400
-DEFAULT_MIN_TURN_SPEED = 150   # Drehgeschwindigkeit bei leichter Kippung
-DEFAULT_MAX_TURN_SPEED = 900   # Drehgeschwindigkeit bei starker Kippung
+DEFAULT_MIN_INNER_SPEED = 150  # Geschwindigkeit des kurveninneren Rads bei enger Kurve
 
 FINGER_TIPS = [8, 12, 16, 20]  # Zeige-, Mittel-, Ring-, kleiner Finger
 FINGER_MCPS = [5, 9, 13, 17]   # jeweilige Grundgelenke (Knöchel)
@@ -132,29 +133,34 @@ def classify(landmarks, w, h):
     return "VORWAERTS", extended, angle
 
 
-def turn_speed_for_angle(angle, min_speed, max_speed):
-    """Rechnet einen Kippwinkel proportional in eine Drehgeschwindigkeit um."""
+def inner_wheel_speed(angle, forward_speed, min_speed):
+    """Geschwindigkeit des kurveninneren Rads: nahe forward_speed bei leichter
+    Kippung (weiter Bogen), sinkt bis min_speed bei starker Kippung (enge Kurve)."""
     if angle is None:
-        return min_speed
+        return forward_speed
     magnitude = min(abs(angle), MAX_TILT_ANGLE_DEG)
     span = MAX_TILT_ANGLE_DEG - ROTATION_THRESHOLD_DEG
     ratio = max(0.0, (magnitude - ROTATION_THRESHOLD_DEG) / span) if span > 0 else 1.0
-    return int(round(min_speed + ratio * (max_speed - min_speed)))
+    return int(round(forward_speed - ratio * (forward_speed - min_speed)))
 
 
-def command_for_gesture(gesture, angle, speeds):
-    """Übersetzt eine erkannte Geste in ein (Richtung, Geschwindigkeit)-Paar."""
+def wheel_speeds_for_gesture(gesture, angle, speeds):
+    """Übersetzt eine erkannte Geste in (Modus, linkes Rad, rechtes Rad)."""
+    forward = speeds["forward"]
     if gesture == "STOPP":
-        return "S", 0
+        return "S", 0, 0
     if gesture == "RUECKWAERTS":
-        return "B", speeds["reverse"]
+        reverse = speeds["reverse"]
+        return "B", -reverse, -reverse
     if gesture == "VORWAERTS":
-        return "V", speeds["forward"]
+        return "V", forward, forward
     if gesture == "LINKS":
-        return "L", turn_speed_for_angle(angle, speeds["min_turn"], speeds["max_turn"])
+        inner = inner_wheel_speed(angle, forward, speeds["min_inner"])
+        return "L", inner, forward
     if gesture == "RECHTS":
-        return "R", turn_speed_for_angle(angle, speeds["min_turn"], speeds["max_turn"])
-    return "S", 0
+        inner = inner_wheel_speed(angle, forward, speeds["min_inner"])
+        return "R", forward, inner
+    return "S", 0, 0
 
 
 def prompt_int(label, default):
@@ -176,10 +182,9 @@ def prompt_speeds():
     print("\nGeschwindigkeiten einstellen (0-1023, Enter = Standardwert):")
     forward = prompt_int("  Vorwärts", DEFAULT_FORWARD_SPEED)
     reverse = prompt_int("  Rückwärts", DEFAULT_REVERSE_SPEED)
-    min_turn = prompt_int("  Drehen (leichte Kippung)", DEFAULT_MIN_TURN_SPEED)
-    max_turn = prompt_int("  Drehen (starke Kippung)", DEFAULT_MAX_TURN_SPEED)
+    min_inner = prompt_int("  Kurveninneres Rad bei enger Kurve", DEFAULT_MIN_INNER_SPEED)
     print()
-    return {"forward": forward, "reverse": reverse, "min_turn": min_turn, "max_turn": max_turn}
+    return {"forward": forward, "reverse": reverse, "min_inner": min_inner}
 
 
 def open_serial(port, baudrate):
@@ -201,11 +206,11 @@ def list_serial_ports():
         print(f"{p.device}  -  {p.description}")
 
 
-def send_command(ser, direction, speed):
-    # Format: 1 Zeichen Richtung + 4-stellige Geschwindigkeit + Zeilenumbruch,
-    # z.B. "L0150\n" - der Zeilenumbruch markiert das Nachrichtenende für den
-    # Sender-micro:bit (siehe microbit-sender/main.py).
-    ser.write(f"{direction}{speed:04d}\n".encode("utf-8"))
+def send_command(ser, mode, left_speed, right_speed):
+    # Format: "<Modus>,<linkes Rad>,<rechtes Rad>\n", z.B. "L,150,600\n".
+    # Negative Werte = rückwärts. Der Zeilenumbruch markiert das
+    # Nachrichtenende für den Sender-micro:bit (siehe microbit-sender/main.py).
+    ser.write(f"{mode},{left_speed},{right_speed}\n".encode("utf-8"))
 
 
 def main():
@@ -243,8 +248,7 @@ def main():
         speeds = {
             "forward": DEFAULT_FORWARD_SPEED,
             "reverse": DEFAULT_REVERSE_SPEED,
-            "min_turn": DEFAULT_MIN_TURN_SPEED,
-            "max_turn": DEFAULT_MAX_TURN_SPEED,
+            "min_inner": DEFAULT_MIN_INNER_SPEED,
         }
     else:
         speeds = prompt_speeds()
@@ -305,15 +309,15 @@ def main():
             # entprellt), damit das Lenken sofort auf die Kippung reagiert -
             # STOPP als Vorgabe ohne erkannte Hand bleibt dabei die sichere
             # Grundeinstellung.
-            direction, speed = command_for_gesture(gesture, angle, speeds)
+            mode, left_speed, right_speed = wheel_speeds_for_gesture(gesture, angle, speeds)
 
             now = time.time()
             if ser is not None and now - last_sent_time >= HEARTBEAT_INTERVAL_S:
                 last_sent_time = now
-                send_command(ser, direction, speed)
+                send_command(ser, mode, left_speed, right_speed)
 
             cv2.putText(
-                frame, f"Geste: {last_shown or '-'} ({direction}{speed:04d})", (10, 30),
+                frame, f"Geste: {last_shown or '-'} (L{left_speed} R{right_speed})", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2,
             )
             if angle is not None:
@@ -329,7 +333,7 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
     if ser is not None:
-        send_command(ser, "S", 0)  # zum Schluss sicher stoppen
+        send_command(ser, "S", 0, 0)  # zum Schluss sicher stoppen
         ser.close()
 
 

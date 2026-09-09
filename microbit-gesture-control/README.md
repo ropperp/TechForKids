@@ -169,9 +169,11 @@ Verzögerung.
 
 Die Kippung wird über die **Rotation** der Hand gemessen, nicht über
 ihre Position im Bild – du kannst die Hand also an beliebiger Stelle
-vor der Kamera halten, wie beim Drehen eines Lenkrads. Beim Lenken ist
-die Drehgeschwindigkeit **proportional zur Kippung**: leicht gekippt
-dreht der BitBot langsam, stark gekippt schneller.
+vor der Kamera halten, wie beim Drehen eines Lenkrads. Beim Lenken
+fährt der BitBot eine **Kurve** (beide Räder vorwärts, das kurveninnere
+Rad wird langsamer) statt auf der Stelle zu drehen – **proportional
+zur Kippung**: leicht gekippt = weiter Bogen, stark gekippt = enge
+Kurve.
 
 ### Schritt 1 (aktueller Stand): Nur die Erkennung testen
 
@@ -220,9 +222,10 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
 
 > Hinweis: 4tronix bietet für den BitBot XL nur eine MakeCode/JavaScript-
 > Bibliothek an, keine fertige MicroPython-Bibliothek zum Importieren.
-> `microbit-bitbot/main.py` steuert die Motor-Pins deshalb direkt an
+> `microbit-bitbot/main.py` steuert Motor-Pins und LEDs deshalb direkt an
 > (Werte aus dem offiziellen MakeCode-Quellcode von 4tronix entnommen:
-> linker Motor = P16/P8, rechter Motor = P14/P12).
+> linker Motor = P16/P8, rechter Motor = P14/P12, 12 RGB-LEDs an P13 im
+> Standard-WS2812/NeoPixel-Format).
 
 **1. Zweiten micro:bit als "Sender" aufspielen** (bleibt per USB am Mac):
    - Inhalt von `hand-control/microbit-sender/main.py` im
@@ -242,16 +245,18 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
    - Port herausfinden: `python gesture_reader.py --list-ports`
    - Starten: `python gesture_reader.py --port /dev/tty.usbmodemXXXX`
    - Das Skript fragt jetzt beim Start nach den Geschwindigkeiten für
-     vorwärts, rückwärts sowie langsames/schnelles Drehen (Enter =
-     Standardwert übernehmen). Mit `--no-prompt` werden direkt die
-     Standardwerte verwendet, ohne zu fragen.
+     vorwärts, rückwärts sowie das kurveninnere Rad bei enger Kurve
+     (Enter = Standardwert übernehmen). Mit `--no-prompt` werden direkt
+     die Standardwerte verwendet, ohne zu fragen.
 
 **4. Ausprobieren:**
-   - Faust → BitBot stoppt
-   - Zwei Finger ("Peace-Zeichen") → BitBot fährt rückwärts
-   - Hand neutral, Finger gespreizt → BitBot fährt geradeaus
-   - Hand nach links/rechts gekippt → BitBot dreht sich auf der Stelle,
-     Geschwindigkeit proportional zur Kippung
+   - Faust → BitBot stoppt, LEDs aus
+   - Zwei Finger ("Peace-Zeichen") → BitBot fährt rückwärts, LEDs rot,
+     kurzer Piepton
+   - Hand neutral, Finger gespreizt → BitBot fährt geradeaus, LEDs grün
+   - Hand nach links/rechts gekippt → BitBot fährt eine Kurve (kein
+     Drehen auf der Stelle mehr), Kurve wird enger je stärker gekippt,
+     LEDs grün
    - Hand aus dem Bild nehmen oder Sender-micro:bit trennen → BitBot
      stoppt automatisch spätestens nach 1 Sekunde (Sicherheits-Watchdog)
 
@@ -260,10 +265,13 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
 sein. Nutzen mehrere Teams gleichzeitig BitBots, braucht jedes Team
 eine eigene Nummer, damit sie sich nicht gegenseitig stören.
 
-Die Geschwindigkeiten leben jetzt komplett in `gesture_reader.py`
-(nicht mehr fest im micro:bit-Code) – entweder interaktiv beim Start
-festlegen, oder die Standardwerte `DEFAULT_FORWARD_SPEED`,
-`DEFAULT_REVERSE_SPEED`, `DEFAULT_MIN_TURN_SPEED` und
-`DEFAULT_MAX_TURN_SPEED` am Kopf von `gesture_reader.py` anpassen.
-`DEFAULT_MIN_TURN_SPEED`/`DEFAULT_MAX_TURN_SPEED` sind die Grenzen für
-das proportionale Lenken (leichte bzw. starke Kippung).
+Die Geschwindigkeiten leben komplett in `gesture_reader.py` (nicht im
+micro:bit-Code) – entweder interaktiv beim Start festlegen, oder die
+Standardwerte `DEFAULT_FORWARD_SPEED`, `DEFAULT_REVERSE_SPEED` und
+`DEFAULT_MIN_INNER_SPEED` am Kopf von `gesture_reader.py` anpassen.
+`DEFAULT_MIN_INNER_SPEED` ist die Geschwindigkeit des kurveninneren
+Rads bei der engsten Kurve (je kleiner, desto enger die Kurve).
+
+Die LED-Helligkeit (`LED_BRIGHTNESS`, 0-255) lässt sich am Kopf von
+`microbit-bitbot/main.py` anpassen, falls 12 LEDs auf voller Helligkeit
+zu grell sind oder zu viel Strom ziehen.

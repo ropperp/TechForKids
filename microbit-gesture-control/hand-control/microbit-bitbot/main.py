@@ -5,14 +5,15 @@ micro:bit auf dem BitBot XL (Motorsteuerung per Funk)
 Läuft auf dem micro:bit, der auf dem BitBot XL steckt (batteriebetrieben,
 kein USB-Kabel während der Fahrt). Empfängt die Funk-Kommandos vom
 Sender-micro:bit (siehe ../microbit-sender/main.py) und steuert damit
-die Motoren an.
+Motoren, LEDs und den Lautsprecher an.
 
-Ein Kommando hat das Format "<Richtung><4-stellige Geschwindigkeit>",
-z.B. "L0150" (links drehen, Geschwindigkeit 150) oder "V0600"
-(vorwärts, Geschwindigkeit 600). Die Geschwindigkeit kommt direkt von
-gesture_reader.py (dort beim Start abfragbar bzw. proportional zur
-Kippung der Hand berechnet) - dieser micro:bit hat also selbst keine
-festen Geschwindigkeits-Konstanten mehr.
+Ein Kommando hat das Format "<Modus>,<linkes Rad>,<rechtes Rad>", z.B.
+"L,150,600" (Kurve links, linkes Rad 150, rechtes Rad 600) oder
+"B,-400,-400" (rückwärts). Negative Werte bedeuten rückwärts. Modus ist
+nur für Anzeige/LEDs/Ton relevant (S=Stopp, B=Rückwärts, V=Vorwärts,
+L=Kurve links, R=Kurve rechts) - die eigentliche Fahrbewegung kommt
+komplett aus den beiden Radgeschwindigkeiten, die gesture_reader.py
+berechnet (dort auch die Geschwindigkeiten einstellbar).
 
 WICHTIG: RADIO_GROUP muss exakt mit microbit-sender/main.py
 übereinstimmen, sonst kommen keine Kommandos an!
@@ -24,8 +25,11 @@ wir die Pins hier direkt an):
     Linker Motor:  vorwärts = P16, rückwärts = P8
     Rechter Motor: vorwärts = P14, rückwärts = P12
 Jeder Motor hat also zwei Pins - PWM (0-1023) auf dem einen dreht ihn
-in die eine Richtung, auf dem anderen in die Gegenrichtung. Für
-"stopp" werden beide Pins auf 0 gesetzt (Motor läuft frei aus).
+in die eine Richtung, auf dem anderen in die Gegenrichtung.
+
+LEDs: 12 RGB-LEDs an P13 (ebenfalls aus dem 4tronix-Quellcode, Standard
+WS2812/NeoPixel-Protokoll) - grün bei Vorwärts-/Kurvenfahrt, rot bei
+Rückwärtsfahrt, aus bei Stopp.
 
 Sicherheit: Kommt länger als WATCHDOG_MS kein neues Funkkommando an
 (z.B. weil der Sender-micro:bit ausgeschaltet oder außer Reichweite
@@ -36,9 +40,14 @@ Aufspielen z.B. über https://python.microbit.org (Python-Editor) oder Mu.
 
 from microbit import *
 import radio
+import music
+import neopixel
 
 RADIO_GROUP = 1
 WATCHDOG_MS = 1000  # Sicherheits-Stopp, wenn so lange kein Kommando ankommt
+
+NUM_LEDS = 12
+LED_BRIGHTNESS = 150  # 0-255, voll aufgedreht (255) ist ziemlich grell
 
 radio.config(group=RADIO_GROUP)
 radio.on()
@@ -48,59 +57,41 @@ left_reverse = pin8
 right_forward = pin14
 right_reverse = pin12
 
+leds = neopixel.NeoPixel(pin13, NUM_LEDS)
 
-def clamp_speed(speed):
-    return max(0, min(1023, speed))
-
-
-def stop(speed=0):
-    left_forward.write_digital(0)
-    left_reverse.write_digital(0)
-    right_forward.write_digital(0)
-    right_reverse.write_digital(0)
+GREEN = (0, LED_BRIGHTNESS, 0)
+RED = (LED_BRIGHTNESS, 0, 0)
+OFF = (0, 0, 0)
 
 
-def forward(speed):
+def set_leds(color):
+    for i in range(NUM_LEDS):
+        leds[i] = color
+    leds.show()
+
+
+def clamp_speed(value):
+    return max(-1023, min(1023, value))
+
+
+def drive_wheel(forward_pin, reverse_pin, speed):
     speed = clamp_speed(speed)
-    left_forward.write_analog(speed)
-    left_reverse.write_digital(0)
-    right_forward.write_analog(speed)
-    right_reverse.write_digital(0)
+    if speed >= 0:
+        forward_pin.write_analog(speed)
+        reverse_pin.write_digital(0)
+    else:
+        forward_pin.write_digital(0)
+        reverse_pin.write_analog(-speed)
 
 
-def reverse(speed):
-    speed = clamp_speed(speed)
-    left_forward.write_digital(0)
-    left_reverse.write_analog(speed)
-    right_forward.write_digital(0)
-    right_reverse.write_analog(speed)
+def drive(left_speed, right_speed):
+    drive_wheel(left_forward, left_reverse, left_speed)
+    drive_wheel(right_forward, right_reverse, right_speed)
 
 
-def spin_left(speed):
-    # Lenkrad nach links gekippt -> auf der Stelle nach links drehen
-    speed = clamp_speed(speed)
-    left_forward.write_digital(0)
-    left_reverse.write_analog(speed)
-    right_forward.write_analog(speed)
-    right_reverse.write_digital(0)
+def stop():
+    drive(0, 0)
 
-
-def spin_right(speed):
-    speed = clamp_speed(speed)
-    left_forward.write_analog(speed)
-    left_reverse.write_digital(0)
-    right_forward.write_digital(0)
-    right_reverse.write_analog(speed)
-
-
-# Muss zu command_for_gesture() in gesture_reader.py passen!
-ACTIONS = {
-    "S": stop,
-    "B": reverse,
-    "V": forward,
-    "L": spin_left,
-    "R": spin_right,
-}
 
 DISPLAY_IMAGES = {
     "S": Image.NO,
@@ -111,29 +102,42 @@ DISPLAY_IMAGES = {
 }
 
 stop()
+set_leds(OFF)
 display.show(Image.HAPPY)  # bereit und wartet auf Funksignale
 
-last_direction = None
+last_mode = None
 last_receive_time = running_time()
 
 while True:
     msg = radio.receive()
-    if msg and len(msg) == 5 and msg[0] in ACTIONS:
-        direction = msg[0]
-        try:
-            speed = int(msg[1:5])
-        except ValueError:
-            speed = None
+    if msg:
+        parts = msg.split(",")
+        if len(parts) == 3 and parts[0] in DISPLAY_IMAGES:
+            mode = parts[0]
+            try:
+                left_speed = int(parts[1])
+                right_speed = int(parts[2])
+            except ValueError:
+                left_speed = right_speed = None
 
-        if speed is not None:
-            last_receive_time = running_time()
-            ACTIONS[direction](speed)
-            if direction != last_direction:
-                last_direction = direction
-                display.show(DISPLAY_IMAGES[direction])
+            if left_speed is not None:
+                last_receive_time = running_time()
+                drive(left_speed, right_speed)
+
+                if mode != last_mode:
+                    last_mode = mode
+                    display.show(DISPLAY_IMAGES[mode])
+                    if mode == "B":
+                        set_leds(RED)
+                        music.pitch(880, 150, pin=pin0, wait=False)
+                    elif mode == "S":
+                        set_leds(OFF)
+                    else:  # V, L, R -> vorwärts unterwegs
+                        set_leds(GREEN)
 
     # Sicherheits-Stopp bei Funkausfall
-    if last_direction != "S" and running_time() - last_receive_time > WATCHDOG_MS:
-        last_direction = "S"
+    if last_mode != "S" and running_time() - last_receive_time > WATCHDOG_MS:
+        last_mode = "S"
         stop()
+        set_leds(OFF)
         display.show(Image.NO)
