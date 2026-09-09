@@ -31,8 +31,9 @@ from microbit import *
 import radio
 
 RADIO_GROUP = 1
-SPEED = 600          # Fahrgeschwindigkeit, 0 (langsam) bis 1023 (schnell)
-WATCHDOG_MS = 1000    # Sicherheits-Stopp, wenn so lange kein Kommando ankommt
+FORWARD_SPEED = 480   # Geschwindigkeit geradeaus, 0 (langsam) bis 1023 (schnell)
+TURN_SPEED = 480      # Geschwindigkeit beim Drehen auf der Stelle, 0 bis 1023
+WATCHDOG_MS = 1000     # Sicherheits-Stopp, wenn so lange kein Kommando ankommt
 
 radio.config(group=RADIO_GROUP)
 radio.on()
@@ -51,25 +52,25 @@ def stop():
 
 
 def forward():
-    left_forward.write_analog(SPEED)
+    left_forward.write_analog(FORWARD_SPEED)
     left_reverse.write_digital(0)
-    right_forward.write_analog(SPEED)
+    right_forward.write_analog(FORWARD_SPEED)
     right_reverse.write_digital(0)
 
 
 def spin_left():
     # Lenkrad nach links gekippt -> auf der Stelle nach links drehen
     left_forward.write_digital(0)
-    left_reverse.write_analog(SPEED)
-    right_forward.write_analog(SPEED)
+    left_reverse.write_analog(TURN_SPEED)
+    right_forward.write_analog(TURN_SPEED)
     right_reverse.write_digital(0)
 
 
 def spin_right():
-    left_forward.write_analog(SPEED)
+    left_forward.write_analog(TURN_SPEED)
     left_reverse.write_digital(0)
     right_forward.write_digital(0)
-    right_reverse.write_analog(SPEED)
+    right_reverse.write_analog(TURN_SPEED)
 
 
 # Muss zu GESTURE_TO_COMMAND in gesture_reader.py passen!

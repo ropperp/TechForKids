@@ -251,5 +251,6 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
 sein. Nutzen mehrere Teams gleichzeitig BitBots, braucht jedes Team
 eine eigene Nummer, damit sie sich nicht gegenseitig stören.
 
-Die Fahrgeschwindigkeit lässt sich über `SPEED` (0-1023) am Kopf von
-`microbit-bitbot/main.py` anpassen.
+Die Fahrgeschwindigkeit lässt sich am Kopf von `microbit-bitbot/main.py`
+getrennt für Geradeausfahrt (`FORWARD_SPEED`) und Drehen auf der Stelle
+(`TURN_SPEED`) anpassen (jeweils 0-1023).
