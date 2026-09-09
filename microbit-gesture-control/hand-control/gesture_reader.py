@@ -126,9 +126,9 @@ def classify(landmarks, w, h):
 
     angle = hand_tilt_degrees(landmarks, w, h)
     if angle > ROTATION_THRESHOLD_DEG:
-        return "RECHTS", extended, angle
-    if angle < -ROTATION_THRESHOLD_DEG:
         return "LINKS", extended, angle
+    if angle < -ROTATION_THRESHOLD_DEG:
+        return "RECHTS", extended, angle
     return "VORWAERTS", extended, angle
 
 
