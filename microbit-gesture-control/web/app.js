@@ -37,8 +37,8 @@ function lookupCommand(className) {
   return GESTURE_CONFIG[className.trim().toLowerCase()] || null;
 }
 
-const STABLE_FRAMES = 8; // so viele gleiche Vorhersagen hintereinander, bevor gesendet wird
-const PREDICTION_INTERVAL_MS = 200;
+const STABLE_FRAMES = 4; // so viele gleiche Vorhersagen hintereinander, bevor gesendet wird
+const PREDICTION_INTERVAL_MS = 100;
 const MIN_CONFIDENCE = 0.8; // Vorhersage muss mindestens so sicher sein
 
 let model, webcam, maxPredictions;

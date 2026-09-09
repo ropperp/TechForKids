@@ -114,6 +114,13 @@ geschrieben sein.
   schlechter werden.
 - **micro:bit reagiert gar nicht** → Prüfen, ob `microbit/main.py`
   erfolgreich aufgespielt wurde (micro:bit sollte ein Smiley zeigen).
+- **Reaktion fühlt sich verzögert an** → Das Modell selbst läuft nach
+  dem Laden komplett lokal im Browser (kein Netzzugriff pro Bild), die
+  Verzögerung kommt von der Entprellung gegen Fehlerkennungen. In
+  `web/app.js` lässt sich das über `STABLE_FRAMES` (Anzahl gleicher
+  Vorhersagen hintereinander) und `PREDICTION_INTERVAL_MS` (Abstand
+  zwischen Vorhersagen) feinjustieren – kleinere Werte reagieren
+  schneller, sind aber anfälliger für kurze Fehlerkennungen.
 - **Nach neuem Training ändert sich nichts** → Falls dein Teachable-
   Machine-Link nach dem Re-Upload gleich bleibt, holt die Seite sich
   Modell und Metadaten inzwischen bewusst ohne Browser-Cache
