@@ -105,8 +105,11 @@ stop()
 set_leds(OFF)
 display.show(Image.HAPPY)  # bereit und wartet auf Funksignale
 
+BEEP_INTERVAL_MS = 1000  # beim Rückwärtsfahren alle X ms piepsen
+
 last_mode = None
 last_receive_time = running_time()
+last_beep_time = running_time()
 
 while True:
     msg = radio.receive()
@@ -129,11 +132,17 @@ while True:
                     display.show(DISPLAY_IMAGES[mode])
                     if mode == "B":
                         set_leds(RED)
-                        music.pitch(880, 150, pin=pin0, wait=False)
+                        # Sofort piepsen, danach übernimmt die Wiederholung unten
+                        last_beep_time = running_time() - BEEP_INTERVAL_MS
                     elif mode == "S":
                         set_leds(OFF)
                     else:  # V, L, R -> vorwärts unterwegs
                         set_leds(GREEN)
+
+    # Beim Rückwärtsfahren alle BEEP_INTERVAL_MS erneut piepsen
+    if last_mode == "B" and running_time() - last_beep_time >= BEEP_INTERVAL_MS:
+        last_beep_time = running_time()
+        music.pitch(880, 150, pin=pin0, wait=False)
 
     # Sicherheits-Stopp bei Funkausfall
     if last_mode != "S" and running_time() - last_receive_time > WATCHDOG_MS:

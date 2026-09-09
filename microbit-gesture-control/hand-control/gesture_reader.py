@@ -156,10 +156,10 @@ def wheel_speeds_for_gesture(gesture, angle, speeds):
         return "V", forward, forward
     if gesture == "LINKS":
         inner = inner_wheel_speed(angle, forward, speeds["min_inner"])
-        return "L", inner, forward
+        return "L", forward, inner
     if gesture == "RECHTS":
         inner = inner_wheel_speed(angle, forward, speeds["min_inner"])
-        return "R", forward, inner
+        return "R", inner, forward
     return "S", 0, 0
 
 
