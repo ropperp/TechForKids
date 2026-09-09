@@ -1,10 +1,25 @@
-# Gestensteuerung: Teachable Machine → micro:bit
+# Gestensteuerung für micro:bit
+
+Dieses Projekt enthält zwei Ansätze:
+
+- **`web/`** – Trainiere ein KI-Modell mit [Teachable Machine](https://teachablemachine.withgoogle.com/)
+  im Browser und lass einen micro:bit dazu einmalig einen Pfeil
+  anzeigen. Kein Python nötig, aber durch die Bild-Erkennung spürbar
+  verzögert (1-2 Sekunden) – gut zum Ausprobieren, für eine flüssige
+  **Echtzeit-Robotersteuerung** aber zu langsam.
+- **`hand-control/`** – Schnelle, trainingsfreie Erkennung per
+  Hand-Landmarken (Faust = Stopp, Hand nach links/rechts gekippt =
+  Lenken, neutral = geradeaus) in Python. Reagiert praktisch ohne
+  Verzögerung und ist der Ausgangspunkt für die Steuerung des
+  **BitBot XL**. Siehe Abschnitt weiter unten.
+
+## Ansatz 1: Teachable Machine → micro:bit (`web/`)
 
 Trainiere dein eigenes KI-Modell mit [Teachable Machine](https://teachablemachine.withgoogle.com/)
 (z.B. "links zeigen", "rechts zeigen", ...) und lass einen micro:bit
 dazu einmalig den passenden Pfeil anzeigen.
 
-## Wie funktioniert das?
+### Wie funktioniert das?
 
 ```
   Webcam (im Browser)              micro:bit
@@ -31,7 +46,7 @@ läuft direkt im Browser.
 > Web Serial funktioniert nur in **Chrome** oder **Edge** (Chromium-Browser),
 > nicht in Safari oder Firefox.
 
-## Schritt 1: Modell mit Teachable Machine trainieren
+### Schritt 1: Modell mit Teachable Machine trainieren
 
 1. Öffne [teachablemachine.withgoogle.com/train/image](https://teachablemachine.withgoogle.com/train/image).
 2. Lege für jede Geste eine eigene Klasse an, z.B.:
@@ -52,7 +67,7 @@ läuft direkt im Browser.
 > Tipp: Nutzt ihr andere Klassennamen als oben, müsst ihr sie in
 > `web/app.js` in `GESTURE_CONFIG` anpassen (siehe Schritt 3).
 
-## Schritt 2: micro:bit programmieren
+### Schritt 2: micro:bit programmieren
 
 1. Öffne den [micro:bit Python-Editor](https://python.microbit.org) (oder
    die [Mu-Editor-App](https://codewith.mu)).
@@ -62,7 +77,7 @@ läuft direkt im Browser.
 
 Der micro:bit zeigt danach ein lachendes Gesicht 🙂 – er ist bereit.
 
-## Schritt 3: Webseite öffnen und verbinden
+### Schritt 3: Webseite öffnen und verbinden
 
 1. Öffne `web/index.html` in **Google Chrome** oder **Microsoft Edge**
    (Doppelklick reicht, oder per `File → Open File...`).
@@ -73,7 +88,7 @@ Der micro:bit zeigt danach ein lachendes Gesicht 🙂 – er ist bereit.
 4. Zeig eine deiner trainierten Gesten – sobald sie stabil erkannt
    wird, zeigt der micro:bit einmalig den passenden Pfeil an.
 
-## Für Weiterentwicklung: Kommandos anpassen/erweitern
+### Für Weiterentwicklung: Kommandos anpassen/erweitern
 
 Alle Zuordnungen zwischen Geste und Anzeige sind an **zwei zentralen
 Stellen** definiert – dort einfach neue Zeilen hinzufügen:
@@ -96,7 +111,7 @@ geschrieben sein.
 - Den micro:bit einen Motor oder ein Rad steuern lassen, das sich je
   nach erkannter Geste dreht.
 
-## Troubleshooting
+### Troubleshooting (Teachable-Machine-Ansatz)
 
 - **"micro:bit verbinden" zeigt keinen Port an** → USB-Kabel prüfen
   (manche Kabel können nur laden, nicht Daten übertragen), micro:bit
@@ -120,7 +135,9 @@ geschrieben sein.
   `web/app.js` lässt sich das über `STABLE_FRAMES` (Anzahl gleicher
   Vorhersagen hintereinander) und `PREDICTION_INTERVAL_MS` (Abstand
   zwischen Vorhersagen) feinjustieren – kleinere Werte reagieren
-  schneller, sind aber anfälliger für kurze Fehlerkennungen.
+  schneller, sind aber anfälliger für kurze Fehlerkennungen. Für eine
+  **spürbar** schnellere, quasi verzögerungsfreie Steuerung (z.B. für
+  einen Roboter) nutze stattdessen `hand-control/` (siehe unten).
 - **Nach neuem Training ändert sich nichts** → Falls dein Teachable-
   Machine-Link nach dem Re-Upload gleich bleibt, holt die Seite sich
   Modell und Metadaten inzwischen bewusst ohne Browser-Cache
@@ -132,3 +149,59 @@ geschrieben sein.
   deine Klasse in Teachable Machine anders heißt als `links`/`rechts`/
   `oben`/`unten`/`nichts`). Den dort angezeigten Klassennamen einfach 1:1
   in `GESTURE_CONFIG` in `web/app.js` ergänzen.
+
+## Ansatz 2: Schnelle Handgesten-Erkennung für den BitBot XL (`hand-control/`)
+
+Für eine **flüssige Echtzeit-Robotersteuerung** ist ein Bild-Klassifizierer
+wie Teachable Machine zu langsam (jedes Bild muss komplett durch ein
+neuronales Netz). Stattdessen nutzt `hand-control/` **Hand-Landmarken**
+(21 Punkte an Handgelenk/Fingern, per [MediaPipe](https://developers.google.com/mediapipe)) –
+reine Geometrie-Rechnung, kein Training nötig, reagiert praktisch ohne
+Verzögerung.
+
+### Erkannte Gesten
+
+- **Faust** (Hand geschlossen) → `STOPP`
+- **Offene Hand, nach links gekippt** (wie ein Lenkrad gedreht) → `LINKS`
+- **Offene Hand, nach rechts gekippt** → `RECHTS`
+- **Offene Hand, nicht gekippt** (neutral, aufrecht) → `VORWAERTS`
+
+Die Kippung wird über die **Rotation** der Hand gemessen, nicht über
+ihre Position im Bild – du kannst die Hand also an beliebiger Stelle
+vor der Kamera halten, wie beim Drehen eines Lenkrads.
+
+### Schritt 1 (aktueller Stand): Nur die Erkennung testen
+
+Noch **ohne** micro:bit/BitBot-Anbindung – zum Ausprobieren und
+Feinjustieren der Erkennung:
+
+```bash
+cd hand-control
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python gesture_reader.py
+```
+
+Ein Kamerafenster öffnet sich, zeigt die erkannten Hand-Landmarken und
+oben links die aktuell erkannte Geste sowie den gemessenen Winkel. In
+der Konsole wird jede neu erkannte Geste zusätzlich als Text ausgegeben
+(z.B. `Erkannt: LINKS (Finger gestreckt: 4, Winkel: -34°)`). Mit `q` im
+Kamerafenster beenden.
+
+Passt die Erkennung nicht gut (z.B. Faust wird nicht erkannt, oder die
+Lenk-Schwelle ist zu empfindlich/unempfindlich), können am Kopf von
+`gesture_reader.py` die Werte `FIST_MAX_EXTENDED` und
+`ROTATION_THRESHOLD_DEG` angepasst werden – der im Kamerafenster
+angezeigte Winkel hilft dabei, einen guten Schwellenwert zu finden.
+
+### Schritt 2 (nächster Schritt): BitBot XL ansteuern
+
+Sobald die Erkennung zuverlässig läuft, verbinden wir `gesture_reader.py`
+mit einem micro:bit auf dem BitBot XL. Der BitBot XL hat eine offizielle
+MicroPython-Bibliothek (`bitbot`) mit fertigen Fahrfunktionen wie
+`bitbot.forward(speed)`, `bitbot.spinLeft(speed)`, `bitbot.spinRight(speed)`
+und `bitbot.stop()` – die vier erkannten Gesten werden dann jeweils auf
+eine dieser Funktionen abgebildet, ähnlich wie schon bei Ansatz 1 über
+eine USB-Serielle-Verbindung. Dieser Teil folgt, sobald Schritt 1 bei
+euch zuverlässig funktioniert.
