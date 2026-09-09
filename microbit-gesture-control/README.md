@@ -195,6 +195,12 @@ Lenk-Schwelle ist zu empfindlich/unempfindlich), können am Kopf von
 `ROTATION_THRESHOLD_DEG` angepasst werden – der im Kamerafenster
 angezeigte Winkel hilft dabei, einen guten Schwellenwert zu finden.
 
+> **Fehler `AttributeError: module 'mediapipe' has no attribute 'solutions'`?**
+> Dann wurde beim Installieren eine zu neue mediapipe-Version geladen
+> (ab Version 1.0 wurde die hier genutzte Schnittstelle entfernt). Im
+> aktivierten `.venv` einmal ausführen: `pip install "mediapipe==0.10.14"`
+> und `gesture_reader.py` erneut starten.
+
 ### Schritt 2 (nächster Schritt): BitBot XL ansteuern
 
 Sobald die Erkennung zuverlässig läuft, verbinden wir `gesture_reader.py`
