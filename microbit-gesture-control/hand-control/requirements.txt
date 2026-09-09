@@ -2,3 +2,4 @@ opencv-python>=4.8
 # Ab mediapipe 1.0 wurde die von diesem Skript genutzte
 # mp.solutions.hands-Schnittstelle entfernt -> auf 0.10.x festnageln.
 mediapipe==0.10.14
+pyserial>=3.5

@@ -1,22 +1,28 @@
 """
-Handgesten-Erkennung (Testprogramm, Schritt 1)
+Handgesten-Erkennung -> micro:bit -> BitBot XL
 =================================================
 
-Erkennt per Webcam vier Gesten und gibt sie in der Konsole und im
-Kamerafenster aus - noch OHNE micro:bit/BitBot-Anbindung:
+Erkennt per Webcam vier Gesten und schickt sie als einzelnes
+Kommando-Zeichen über die USB-Serielle-Verbindung an den
+"Sender"-micro:bit (siehe microbit-sender/main.py), der sie per Funk
+an den micro:bit auf dem BitBot XL weiterleitet
+(siehe microbit-bitbot/main.py):
 
-- Faust (Hand geschlossen)              -> STOPP
-- Offene Hand, nach links gekippt       -> LINKS
-- Offene Hand, nach rechts gekippt      -> RECHTS
-- Offene Hand, nicht gekippt (neutral)  -> VORWAERTS
+- Faust (Hand geschlossen)              -> STOPP        -> "S"
+- Offene Hand, nach links gekippt       -> LINKS         -> "L"
+- Offene Hand, nach rechts gekippt      -> RECHTS        -> "R"
+- Offene Hand, nicht gekippt (neutral)  -> VORWAERTS      -> "V"
+- Keine Hand im Bild                    -> STOPP (Sicherheit!)
 
 Die "Kippung" wird über die Rotation der Hand gemessen (wie ein
 Lenkrad), nicht über die Position im Bild - du kannst deine Hand also
 an beliebiger Stelle vor der Kamera halten.
 
-Ziel dieses Programms: die Erkennung in Ruhe ausprobieren und bei
-Bedarf FIST_MAX_EXTENDED / ROTATION_THRESHOLD_DEG anpassen, bevor
-daraus die Ansteuerung des BitBot XL gebaut wird.
+Damit der Roboter nicht einfach weiterfährt, falls ein Funkpaket
+verloren geht, wird das aktuelle Kommando nicht nur bei Änderung,
+sondern regelmäßig (HEARTBEAT_INTERVAL_S) erneut gesendet. Der
+micro:bit auf dem BitBot stoppt automatisch, wenn länger keine
+Nachricht mehr ankommt.
 
 Voraussetzungen:
     python3 -m venv .venv
@@ -24,14 +30,26 @@ Voraussetzungen:
     pip install -r requirements.txt
 
 Benutzung:
-    python gesture_reader.py
+    python gesture_reader.py --list-ports           # verfügbare Ports anzeigen
+    python gesture_reader.py --port /dev/tty.usbmodemXXXX
+    python gesture_reader.py --dry-run               # ohne micro:bit testen
     'q' im Kamerafenster beendet das Programm.
 """
 
+import argparse
 import math
+import sys
+import time
 
 import cv2
 import mediapipe as mp
+
+try:
+    import serial
+    from serial.tools import list_ports
+except ImportError:
+    serial = None
+    list_ports = None
 
 # ---------------------------------------------------------------------
 # HIER ANPASSEN, falls die Erkennung nicht gut passt:
@@ -39,9 +57,18 @@ import mediapipe as mp
 FIST_MAX_EXTENDED = 1        # so viele gestreckte Finger gelten noch als Faust
 ROTATION_THRESHOLD_DEG = 20  # ab dieser Neigung (in Grad) gilt die Hand als "gekippt"
 STABLE_FRAMES = 3            # so viele Frames hintereinander für eine stabile Erkennung
+HEARTBEAT_INTERVAL_S = 0.3   # aktuelles Kommando spätestens alle X Sekunden erneut senden
 
 FINGER_TIPS = [8, 12, 16, 20]  # Zeige-, Mittel-, Ring-, kleiner Finger
 FINGER_MCPS = [5, 9, 13, 17]   # jeweilige Grundgelenke (Knöchel)
+
+# Muss zu COMMANDS in microbit-bitbot/main.py passen!
+GESTURE_TO_COMMAND = {
+    "STOPP": "S",
+    "LINKS": "L",
+    "RECHTS": "R",
+    "VORWAERTS": "V",
+}
 
 
 def count_extended_fingers(landmarks):
@@ -95,18 +122,67 @@ def classify(landmarks, w, h):
     return "VORWAERTS", extended, angle
 
 
+def open_serial(port, baudrate):
+    if serial is None:
+        print("pyserial ist nicht installiert. Bitte 'pip install pyserial' ausführen.")
+        sys.exit(1)
+    return serial.Serial(port, baudrate=baudrate, timeout=0)
+
+
+def list_serial_ports():
+    if list_ports is None:
+        print("pyserial ist nicht installiert. Bitte 'pip install pyserial' ausführen.")
+        sys.exit(1)
+    ports = list(list_ports.comports())
+    if not ports:
+        print("Keine seriellen Ports gefunden. Ist der Sender-micro:bit per USB verbunden?")
+        return
+    for p in ports:
+        print(f"{p.device}  -  {p.description}")
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--port",
+        help="Serieller Port des Sender-micro:bit, z.B. /dev/tty.usbmodem1102 (siehe --list-ports)",
+    )
+    parser.add_argument("--baudrate", type=int, default=115200)
+    parser.add_argument("--camera", type=int, default=0, help="Index der Webcam (Standard: 0)")
+    parser.add_argument(
+        "--list-ports", action="store_true", help="Verfügbare serielle Ports anzeigen und beenden"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Nur Vorschau anzeigen, nichts an micro:bit senden"
+    )
+    args = parser.parse_args()
+
+    if args.list_ports:
+        list_serial_ports()
+        return
+
+    ser = None
+    if not args.dry_run:
+        if not args.port:
+            print("Bitte --port angeben (siehe --list-ports) oder --dry-run zum Testen verwenden.")
+            sys.exit(1)
+        ser = open_serial(args.port, args.baudrate)
+        time.sleep(2)  # micro:bit Zeit zum Neustarten nach Verbindungsaufbau geben
+
     mp_hands = mp.solutions.hands
     mp_drawing = mp.solutions.drawing_utils
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
         print("Webcam konnte nicht geöffnet werden.")
+        if ser is not None:
+            ser.close()
         return
 
     candidate = None
     candidate_count = 0
     last_shown = None
+    last_sent_time = 0.0
 
     with mp_hands.Hands(
         model_complexity=0,
@@ -125,7 +201,9 @@ def main():
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = hands.process(rgb)
 
-            gesture, extended, angle = None, 0, None
+            # Ohne erkannte Hand ist STOPP die sichere Vorgabe (z.B. wenn die
+            # Hand aus dem Bild geht, soll der Roboter nicht weiterfahren).
+            gesture, extended, angle = "STOPP", 0, None
             if results.multi_hand_landmarks:
                 hand_landmarks = results.multi_hand_landmarks[0]
                 mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
@@ -137,11 +215,17 @@ def main():
                 candidate = gesture
                 candidate_count = 1
 
-            if candidate_count >= STABLE_FRAMES and candidate != last_shown:
-                last_shown = candidate
-                if last_shown:
+            if candidate_count >= STABLE_FRAMES:
+                if candidate != last_shown:
+                    last_shown = candidate
                     winkel_text = f", Winkel: {angle:.0f}°" if angle is not None else ""
                     print(f"Erkannt: {last_shown} (Finger gestreckt: {extended}{winkel_text})")
+
+                now = time.time()
+                if ser is not None and now - last_sent_time >= HEARTBEAT_INTERVAL_S:
+                    last_sent_time = now
+                    command = GESTURE_TO_COMMAND[last_shown]
+                    ser.write(command.encode("utf-8"))
 
             cv2.putText(
                 frame, f"Geste: {last_shown or '-'}", (10, 30),
@@ -159,6 +243,10 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
+    if ser is not None:
+        # Zum Schluss sicher stoppen
+        ser.write(GESTURE_TO_COMMAND["STOPP"].encode("utf-8"))
+        ser.close()
 
 
 if __name__ == "__main__":

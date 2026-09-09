@@ -201,13 +201,55 @@ angezeigte Winkel hilft dabei, einen guten Schwellenwert zu finden.
 > aktivierten `.venv` einmal ausführen: `pip install "mediapipe==0.10.14"`
 > und `gesture_reader.py` erneut starten.
 
-### Schritt 2 (nächster Schritt): BitBot XL ansteuern
+### Schritt 2: BitBot XL per Funk ansteuern
 
-Sobald die Erkennung zuverlässig läuft, verbinden wir `gesture_reader.py`
-mit einem micro:bit auf dem BitBot XL. Der BitBot XL hat eine offizielle
-MicroPython-Bibliothek (`bitbot`) mit fertigen Fahrfunktionen wie
-`bitbot.forward(speed)`, `bitbot.spinLeft(speed)`, `bitbot.spinRight(speed)`
-und `bitbot.stop()` – die vier erkannten Gesten werden dann jeweils auf
-eine dieser Funktionen abgebildet, ähnlich wie schon bei Ansatz 1 über
-eine USB-Serielle-Verbindung. Dieser Teil folgt, sobald Schritt 1 bei
-euch zuverlässig funktioniert.
+Der BitBot XL soll frei fahren (batteriebetrieben) – ein USB-Kabel vom
+Mac direkt zu seinem micro:bit würde ihn also "anleinen". Deshalb
+kommt ein **zweiter micro:bit** dazwischen:
+
+```
+Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
+┌────────────────┐  USB   ┌────────────────┐ Funk  ┌───────────────────┐
+│ gesture_reader  │ ─────▶ │ funkt Kommando  │ ────▶ │ steuert Motoren    │
+│ .py             │ Kabel  │ weiter          │       │ direkt über Pins   │
+└────────────────┘        └────────────────┘        └───────────────────┘
+```
+
+> Hinweis: 4tronix bietet für den BitBot XL nur eine MakeCode/JavaScript-
+> Bibliothek an, keine fertige MicroPython-Bibliothek zum Importieren.
+> `microbit-bitbot/main.py` steuert die Motor-Pins deshalb direkt an
+> (Werte aus dem offiziellen MakeCode-Quellcode von 4tronix entnommen:
+> linker Motor = P16/P8, rechter Motor = P14/P12).
+
+**1. Zweiten micro:bit als "Sender" aufspielen** (bleibt per USB am Mac):
+   - Inhalt von `hand-control/microbit-sender/main.py` im
+     [Python-Editor](https://python.microbit.org) öffnen und auf den micro:bit
+     flashen.
+
+**2. micro:bit auf dem BitBot XL aufspielen:**
+   - Diesen micro:bit **kurz per USB an den Mac anschließen** (nur zum
+     Programmieren, danach wieder auf den BitBot stecken).
+   - Inhalt von `hand-control/microbit-bitbot/main.py` im Python-Editor
+     öffnen und auf diesen micro:bit flashen.
+   - micro:bit wieder auf den BitBot XL stecken, BitBot einschalten
+     (Batterien). Er zeigt ein Smiley 🙂 sobald er bereit ist.
+
+**3. gesture_reader.py mit dem Sender-micro:bit verbinden:**
+   - Sender-micro:bit (aus Schritt 1) per USB am Mac lassen.
+   - Port herausfinden: `python gesture_reader.py --list-ports`
+   - Starten: `python gesture_reader.py --port /dev/tty.usbmodemXXXX`
+
+**4. Ausprobieren:**
+   - Faust → BitBot stoppt
+   - Hand nach links/rechts gekippt → BitBot dreht sich auf der Stelle
+   - Hand neutral, Finger gespreizt → BitBot fährt geradeaus
+   - Hand aus dem Bild nehmen oder Sender-micro:bit trennen → BitBot
+     stoppt automatisch spätestens nach 1 Sekunde (Sicherheits-Watchdog)
+
+**Wichtig:** `RADIO_GROUP` (Standard `1`) muss in
+`microbit-sender/main.py` und `microbit-bitbot/main.py` identisch
+sein. Nutzen mehrere Teams gleichzeitig BitBots, braucht jedes Team
+eine eigene Nummer, damit sie sich nicht gegenseitig stören.
+
+Die Fahrgeschwindigkeit lässt sich über `SPEED` (0-1023) am Kopf von
+`microbit-bitbot/main.py` anpassen.
