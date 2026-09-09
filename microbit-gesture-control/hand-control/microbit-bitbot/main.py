@@ -7,6 +7,13 @@ kein USB-Kabel während der Fahrt). Empfängt die Funk-Kommandos vom
 Sender-micro:bit (siehe ../microbit-sender/main.py) und steuert damit
 die Motoren an.
 
+Ein Kommando hat das Format "<Richtung><4-stellige Geschwindigkeit>",
+z.B. "L0150" (links drehen, Geschwindigkeit 150) oder "V0600"
+(vorwärts, Geschwindigkeit 600). Die Geschwindigkeit kommt direkt von
+gesture_reader.py (dort beim Start abfragbar bzw. proportional zur
+Kippung der Hand berechnet) - dieser micro:bit hat also selbst keine
+festen Geschwindigkeits-Konstanten mehr.
+
 WICHTIG: RADIO_GROUP muss exakt mit microbit-sender/main.py
 übereinstimmen, sonst kommen keine Kommandos an!
 
@@ -31,9 +38,7 @@ from microbit import *
 import radio
 
 RADIO_GROUP = 1
-FORWARD_SPEED = 480   # Geschwindigkeit geradeaus, 0 (langsam) bis 1023 (schnell)
-TURN_SPEED = 480      # Geschwindigkeit beim Drehen auf der Stelle, 0 bis 1023
-WATCHDOG_MS = 1000     # Sicherheits-Stopp, wenn so lange kein Kommando ankommt
+WATCHDOG_MS = 1000  # Sicherheits-Stopp, wenn so lange kein Kommando ankommt
 
 radio.config(group=RADIO_GROUP)
 radio.on()
@@ -44,63 +49,91 @@ right_forward = pin14
 right_reverse = pin12
 
 
-def stop():
+def clamp_speed(speed):
+    return max(0, min(1023, speed))
+
+
+def stop(speed=0):
     left_forward.write_digital(0)
     left_reverse.write_digital(0)
     right_forward.write_digital(0)
     right_reverse.write_digital(0)
 
 
-def forward():
-    left_forward.write_analog(FORWARD_SPEED)
+def forward(speed):
+    speed = clamp_speed(speed)
+    left_forward.write_analog(speed)
     left_reverse.write_digital(0)
-    right_forward.write_analog(FORWARD_SPEED)
+    right_forward.write_analog(speed)
     right_reverse.write_digital(0)
 
 
-def spin_left():
+def reverse(speed):
+    speed = clamp_speed(speed)
+    left_forward.write_digital(0)
+    left_reverse.write_analog(speed)
+    right_forward.write_digital(0)
+    right_reverse.write_analog(speed)
+
+
+def spin_left(speed):
     # Lenkrad nach links gekippt -> auf der Stelle nach links drehen
+    speed = clamp_speed(speed)
     left_forward.write_digital(0)
-    left_reverse.write_analog(TURN_SPEED)
-    right_forward.write_analog(TURN_SPEED)
+    left_reverse.write_analog(speed)
+    right_forward.write_analog(speed)
     right_reverse.write_digital(0)
 
 
-def spin_right():
-    left_forward.write_analog(TURN_SPEED)
+def spin_right(speed):
+    speed = clamp_speed(speed)
+    left_forward.write_analog(speed)
     left_reverse.write_digital(0)
     right_forward.write_digital(0)
-    right_reverse.write_analog(TURN_SPEED)
+    right_reverse.write_analog(speed)
 
 
-# Muss zu GESTURE_TO_COMMAND in gesture_reader.py passen!
-COMMANDS = {
+# Muss zu command_for_gesture() in gesture_reader.py passen!
+ACTIONS = {
     "S": stop,
+    "B": reverse,
+    "V": forward,
     "L": spin_left,
     "R": spin_right,
-    "V": forward,
+}
+
+DISPLAY_IMAGES = {
+    "S": Image.NO,
+    "B": Image.ARROW_S,
+    "V": Image.ARROW_N,
+    "L": Image.ARROW_W,
+    "R": Image.ARROW_E,
 }
 
 stop()
 display.show(Image.HAPPY)  # bereit und wartet auf Funksignale
 
-last_cmd = None
+last_direction = None
 last_receive_time = running_time()
 
 while True:
     msg = radio.receive()
-    if msg in COMMANDS:
-        last_receive_time = running_time()
-        if msg != last_cmd:
-            last_cmd = msg
-            COMMANDS[msg]()
-            display.show(Image.ARROW_N if msg == "V" else
-                         Image.ARROW_W if msg == "L" else
-                         Image.ARROW_E if msg == "R" else
-                         Image.NO)
+    if msg and len(msg) == 5 and msg[0] in ACTIONS:
+        direction = msg[0]
+        try:
+            speed = int(msg[1:5])
+        except ValueError:
+            speed = None
+
+        if speed is not None:
+            last_receive_time = running_time()
+            ACTIONS[direction](speed)
+            if direction != last_direction:
+                last_direction = direction
+                display.show(DISPLAY_IMAGES[direction])
 
     # Sicherheits-Stopp bei Funkausfall
-    if last_cmd != "S" and running_time() - last_receive_time > WATCHDOG_MS:
-        last_cmd = "S"
+    if last_direction != "S" and running_time() - last_receive_time > WATCHDOG_MS:
+        last_direction = "S"
         stop()
         display.show(Image.NO)

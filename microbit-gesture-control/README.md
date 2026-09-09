@@ -161,14 +161,17 @@ Verzögerung.
 
 ### Erkannte Gesten
 
-- **Faust** (Hand geschlossen) → `STOPP`
+- **Faust** (0-1 Finger gestreckt) → `STOPP`
+- **Zwei Finger gestreckt** ("Peace-Zeichen") → `RUECKWAERTS`
+- **Offene Hand, nicht gekippt** (neutral, aufrecht) → `VORWAERTS`
 - **Offene Hand, nach links gekippt** (wie ein Lenkrad gedreht) → `LINKS`
 - **Offene Hand, nach rechts gekippt** → `RECHTS`
-- **Offene Hand, nicht gekippt** (neutral, aufrecht) → `VORWAERTS`
 
 Die Kippung wird über die **Rotation** der Hand gemessen, nicht über
 ihre Position im Bild – du kannst die Hand also an beliebiger Stelle
-vor der Kamera halten, wie beim Drehen eines Lenkrads.
+vor der Kamera halten, wie beim Drehen eines Lenkrads. Beim Lenken ist
+die Drehgeschwindigkeit **proportional zur Kippung**: leicht gekippt
+dreht der BitBot langsam, stark gekippt schneller.
 
 ### Schritt 1 (aktueller Stand): Nur die Erkennung testen
 
@@ -238,11 +241,17 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
    - Sender-micro:bit (aus Schritt 1) per USB am Mac lassen.
    - Port herausfinden: `python gesture_reader.py --list-ports`
    - Starten: `python gesture_reader.py --port /dev/tty.usbmodemXXXX`
+   - Das Skript fragt jetzt beim Start nach den Geschwindigkeiten für
+     vorwärts, rückwärts sowie langsames/schnelles Drehen (Enter =
+     Standardwert übernehmen). Mit `--no-prompt` werden direkt die
+     Standardwerte verwendet, ohne zu fragen.
 
 **4. Ausprobieren:**
    - Faust → BitBot stoppt
-   - Hand nach links/rechts gekippt → BitBot dreht sich auf der Stelle
+   - Zwei Finger ("Peace-Zeichen") → BitBot fährt rückwärts
    - Hand neutral, Finger gespreizt → BitBot fährt geradeaus
+   - Hand nach links/rechts gekippt → BitBot dreht sich auf der Stelle,
+     Geschwindigkeit proportional zur Kippung
    - Hand aus dem Bild nehmen oder Sender-micro:bit trennen → BitBot
      stoppt automatisch spätestens nach 1 Sekunde (Sicherheits-Watchdog)
 
@@ -251,6 +260,10 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
 sein. Nutzen mehrere Teams gleichzeitig BitBots, braucht jedes Team
 eine eigene Nummer, damit sie sich nicht gegenseitig stören.
 
-Die Fahrgeschwindigkeit lässt sich am Kopf von `microbit-bitbot/main.py`
-getrennt für Geradeausfahrt (`FORWARD_SPEED`) und Drehen auf der Stelle
-(`TURN_SPEED`) anpassen (jeweils 0-1023).
+Die Geschwindigkeiten leben jetzt komplett in `gesture_reader.py`
+(nicht mehr fest im micro:bit-Code) – entweder interaktiv beim Start
+festlegen, oder die Standardwerte `DEFAULT_FORWARD_SPEED`,
+`DEFAULT_REVERSE_SPEED`, `DEFAULT_MIN_TURN_SPEED` und
+`DEFAULT_MAX_TURN_SPEED` am Kopf von `gesture_reader.py` anpassen.
+`DEFAULT_MIN_TURN_SPEED`/`DEFAULT_MAX_TURN_SPEED` sind die Grenzen für
+das proportionale Lenken (leichte bzw. starke Kippung).

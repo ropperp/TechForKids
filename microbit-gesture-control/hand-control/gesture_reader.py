@@ -2,21 +2,28 @@
 Handgesten-Erkennung -> micro:bit -> BitBot XL
 =================================================
 
-Erkennt per Webcam vier Gesten und schickt sie als einzelnes
-Kommando-Zeichen über die USB-Serielle-Verbindung an den
-"Sender"-micro:bit (siehe microbit-sender/main.py), der sie per Funk
-an den micro:bit auf dem BitBot XL weiterleitet
-(siehe microbit-bitbot/main.py):
+Erkennt per Webcam fünf Gesten und schickt sie als Kommando (Richtung +
+Geschwindigkeit) über die USB-Serielle-Verbindung an den
+"Sender"-micro:bit (siehe microbit-sender/main.py), der es per Funk an
+den micro:bit auf dem BitBot XL weiterleitet (siehe
+microbit-bitbot/main.py):
 
-- Faust (Hand geschlossen)              -> STOPP        -> "S"
-- Offene Hand, nach links gekippt       -> LINKS         -> "L"
-- Offene Hand, nach rechts gekippt      -> RECHTS        -> "R"
-- Offene Hand, nicht gekippt (neutral)  -> VORWAERTS      -> "V"
-- Keine Hand im Bild                    -> STOPP (Sicherheit!)
+- Faust (0-1 Finger gestreckt)            -> STOPP      -> "S"
+- Zwei Finger gestreckt ("Peace-Zeichen")  -> RUECKWAERTS -> "B"
+- Offene Hand, nicht gekippt (neutral)     -> VORWAERTS   -> "V"
+- Offene Hand, nach links gekippt          -> LINKS       -> "L"
+- Offene Hand, nach rechts gekippt         -> RECHTS      -> "R"
+- Keine Hand im Bild                       -> STOPP (Sicherheit!)
 
 Die "Kippung" wird über die Rotation der Hand gemessen (wie ein
-Lenkrad), nicht über die Position im Bild - du kannst deine Hand also
-an beliebiger Stelle vor der Kamera halten.
+Lenkrad), nicht über die Position im Bild. Beim Lenken (LINKS/RECHTS)
+wird die Geschwindigkeit **proportional** zur Kippung gesendet: leicht
+gekippt -> langsame Drehung, stark gekippt -> schnelle Drehung.
+
+Die Fahrgeschwindigkeiten (vorwärts/Lenken/rückwärts) werden beim Start
+abgefragt (Enter = Standardwert übernehmen), damit man sie nicht im
+Code ändern muss. Mit --no-prompt werden die Standardwerte direkt ohne
+Nachfrage verwendet.
 
 Damit der Roboter nicht einfach weiterfährt, falls ein Funkpaket
 verloren geht, wird das aktuelle Kommando nicht nur bei Änderung,
@@ -32,6 +39,7 @@ Voraussetzungen:
 Benutzung:
     python gesture_reader.py --list-ports           # verfügbare Ports anzeigen
     python gesture_reader.py --port /dev/tty.usbmodemXXXX
+    python gesture_reader.py --port /dev/tty.usbmodemXXXX --no-prompt
     python gesture_reader.py --dry-run               # ohne micro:bit testen
     'q' im Kamerafenster beendet das Programm.
 """
@@ -54,21 +62,21 @@ except ImportError:
 # ---------------------------------------------------------------------
 # HIER ANPASSEN, falls die Erkennung nicht gut passt:
 # ---------------------------------------------------------------------
-FIST_MAX_EXTENDED = 1        # so viele gestreckte Finger gelten noch als Faust
-ROTATION_THRESHOLD_DEG = 20  # ab dieser Neigung (in Grad) gilt die Hand als "gekippt"
-STABLE_FRAMES = 3            # so viele Frames hintereinander für eine stabile Erkennung
-HEARTBEAT_INTERVAL_S = 0.3   # aktuelles Kommando spätestens alle X Sekunden erneut senden
+FIST_MAX_EXTENDED = 1         # so viele gestreckte Finger gelten noch als Faust
+REVERSE_EXTENDED = 2          # so viele gestreckte Finger gelten als "Rückwärts"-Geste
+ROTATION_THRESHOLD_DEG = 20   # ab dieser Neigung (in Grad) gilt die Hand als "gekippt"
+MAX_TILT_ANGLE_DEG = 60       # ab dieser Neigung wird mit voller Geschwindigkeit gedreht
+STABLE_FRAMES = 3             # so viele Frames hintereinander für eine stabile Erkennung
+HEARTBEAT_INTERVAL_S = 0.3    # aktuelles Kommando spätestens alle X Sekunden erneut senden
+
+# Standard-Geschwindigkeiten (0-1023), können beim Start angepasst werden
+DEFAULT_FORWARD_SPEED = 600
+DEFAULT_REVERSE_SPEED = 400
+DEFAULT_MIN_TURN_SPEED = 150   # Drehgeschwindigkeit bei leichter Kippung
+DEFAULT_MAX_TURN_SPEED = 900   # Drehgeschwindigkeit bei starker Kippung
 
 FINGER_TIPS = [8, 12, 16, 20]  # Zeige-, Mittel-, Ring-, kleiner Finger
 FINGER_MCPS = [5, 9, 13, 17]   # jeweilige Grundgelenke (Knöchel)
-
-# Muss zu COMMANDS in microbit-bitbot/main.py passen!
-GESTURE_TO_COMMAND = {
-    "STOPP": "S",
-    "LINKS": "L",
-    "RECHTS": "R",
-    "VORWAERTS": "V",
-}
 
 
 def count_extended_fingers(landmarks):
@@ -113,6 +121,8 @@ def classify(landmarks, w, h):
     extended = count_extended_fingers(landmarks)
     if extended <= FIST_MAX_EXTENDED:
         return "STOPP", extended, None
+    if extended == REVERSE_EXTENDED:
+        return "RUECKWAERTS", extended, None
 
     angle = hand_tilt_degrees(landmarks, w, h)
     if angle > ROTATION_THRESHOLD_DEG:
@@ -120,6 +130,56 @@ def classify(landmarks, w, h):
     if angle < -ROTATION_THRESHOLD_DEG:
         return "LINKS", extended, angle
     return "VORWAERTS", extended, angle
+
+
+def turn_speed_for_angle(angle, min_speed, max_speed):
+    """Rechnet einen Kippwinkel proportional in eine Drehgeschwindigkeit um."""
+    if angle is None:
+        return min_speed
+    magnitude = min(abs(angle), MAX_TILT_ANGLE_DEG)
+    span = MAX_TILT_ANGLE_DEG - ROTATION_THRESHOLD_DEG
+    ratio = max(0.0, (magnitude - ROTATION_THRESHOLD_DEG) / span) if span > 0 else 1.0
+    return int(round(min_speed + ratio * (max_speed - min_speed)))
+
+
+def command_for_gesture(gesture, angle, speeds):
+    """Übersetzt eine erkannte Geste in ein (Richtung, Geschwindigkeit)-Paar."""
+    if gesture == "STOPP":
+        return "S", 0
+    if gesture == "RUECKWAERTS":
+        return "B", speeds["reverse"]
+    if gesture == "VORWAERTS":
+        return "V", speeds["forward"]
+    if gesture == "LINKS":
+        return "L", turn_speed_for_angle(angle, speeds["min_turn"], speeds["max_turn"])
+    if gesture == "RECHTS":
+        return "R", turn_speed_for_angle(angle, speeds["min_turn"], speeds["max_turn"])
+    return "S", 0
+
+
+def prompt_int(label, default):
+    try:
+        raw = input(f"{label} [Standard {default}, Enter = übernehmen]: ").strip()
+    except EOFError:
+        raw = ""
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        print(f"Ungültige Eingabe, verwende Standardwert {default}.")
+        return default
+    return max(0, min(1023, value))
+
+
+def prompt_speeds():
+    print("\nGeschwindigkeiten einstellen (0-1023, Enter = Standardwert):")
+    forward = prompt_int("  Vorwärts", DEFAULT_FORWARD_SPEED)
+    reverse = prompt_int("  Rückwärts", DEFAULT_REVERSE_SPEED)
+    min_turn = prompt_int("  Drehen (leichte Kippung)", DEFAULT_MIN_TURN_SPEED)
+    max_turn = prompt_int("  Drehen (starke Kippung)", DEFAULT_MAX_TURN_SPEED)
+    print()
+    return {"forward": forward, "reverse": reverse, "min_turn": min_turn, "max_turn": max_turn}
 
 
 def open_serial(port, baudrate):
@@ -141,6 +201,13 @@ def list_serial_ports():
         print(f"{p.device}  -  {p.description}")
 
 
+def send_command(ser, direction, speed):
+    # Format: 1 Zeichen Richtung + 4-stellige Geschwindigkeit + Zeilenumbruch,
+    # z.B. "L0150\n" - der Zeilenumbruch markiert das Nachrichtenende für den
+    # Sender-micro:bit (siehe microbit-sender/main.py).
+    ser.write(f"{direction}{speed:04d}\n".encode("utf-8"))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -155,6 +222,9 @@ def main():
     parser.add_argument(
         "--dry-run", action="store_true", help="Nur Vorschau anzeigen, nichts an micro:bit senden"
     )
+    parser.add_argument(
+        "--no-prompt", action="store_true", help="Beim Start nicht nach Geschwindigkeiten fragen"
+    )
     args = parser.parse_args()
 
     if args.list_ports:
@@ -168,6 +238,16 @@ def main():
             sys.exit(1)
         ser = open_serial(args.port, args.baudrate)
         time.sleep(2)  # micro:bit Zeit zum Neustarten nach Verbindungsaufbau geben
+
+    if args.no_prompt or args.dry_run:
+        speeds = {
+            "forward": DEFAULT_FORWARD_SPEED,
+            "reverse": DEFAULT_REVERSE_SPEED,
+            "min_turn": DEFAULT_MIN_TURN_SPEED,
+            "max_turn": DEFAULT_MAX_TURN_SPEED,
+        }
+    else:
+        speeds = prompt_speeds()
 
     mp_hands = mp.solutions.hands
     mp_drawing = mp.solutions.drawing_utils
@@ -209,27 +289,32 @@ def main():
                 mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 gesture, extended, angle = classify(hand_landmarks.landmark, w, h)
 
+            # Für Konsole/Overlay: erst nach STABLE_FRAMES gleichen Frames
+            # übernehmen, damit es nicht zwischen Zuständen flackert.
             if gesture == candidate:
                 candidate_count += 1
             else:
                 candidate = gesture
                 candidate_count = 1
+            if candidate_count >= STABLE_FRAMES and candidate != last_shown:
+                last_shown = candidate
+                winkel_text = f", Winkel: {angle:.0f}°" if angle is not None else ""
+                print(f"Erkannt: {last_shown} (Finger gestreckt: {extended}{winkel_text})")
 
-            if candidate_count >= STABLE_FRAMES:
-                if candidate != last_shown:
-                    last_shown = candidate
-                    winkel_text = f", Winkel: {angle:.0f}°" if angle is not None else ""
-                    print(f"Erkannt: {last_shown} (Finger gestreckt: {extended}{winkel_text})")
+            # Für den Roboter: die *aktuelle* Geste direkt verwenden (nicht
+            # entprellt), damit das Lenken sofort auf die Kippung reagiert -
+            # STOPP als Vorgabe ohne erkannte Hand bleibt dabei die sichere
+            # Grundeinstellung.
+            direction, speed = command_for_gesture(gesture, angle, speeds)
 
-                now = time.time()
-                if ser is not None and now - last_sent_time >= HEARTBEAT_INTERVAL_S:
-                    last_sent_time = now
-                    command = GESTURE_TO_COMMAND[last_shown]
-                    ser.write(command.encode("utf-8"))
+            now = time.time()
+            if ser is not None and now - last_sent_time >= HEARTBEAT_INTERVAL_S:
+                last_sent_time = now
+                send_command(ser, direction, speed)
 
             cv2.putText(
-                frame, f"Geste: {last_shown or '-'}", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2,
+                frame, f"Geste: {last_shown or '-'} ({direction}{speed:04d})", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2,
             )
             if angle is not None:
                 cv2.putText(
@@ -244,8 +329,7 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
     if ser is not None:
-        # Zum Schluss sicher stoppen
-        ser.write(GESTURE_TO_COMMAND["STOPP"].encode("utf-8"))
+        send_command(ser, "S", 0)  # zum Schluss sicher stoppen
         ser.close()
 
 
