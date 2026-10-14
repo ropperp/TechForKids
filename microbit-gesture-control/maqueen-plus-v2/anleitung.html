@@ -163,7 +163,7 @@ pip install -r requirements.txt</code></pre>
   <li><strong><code>pip install -r requirements.txt</code> bricht ab mit "<code>Could not find a version that satisfies the requirement jaxlib</code>":</strong>
     mediapipe verlangt <code>jax</code>/<code>jaxlib</code>, obwohl unser Skript das gar nicht braucht - auf manchen Macs gibt es dafür gerade kein passendes Paket. Workaround in der aktivierten <code>.venv</code>:
     <pre><code>pip install --no-deps mediapipe==0.10.14
-pip install numpy attrs flatbuffers "protobuf>=4.25.3,&lt;5" absl-py sounddevice opencv-python pyserial</code></pre>
+pip install numpy attrs flatbuffers "protobuf>=4.25.3,&lt;5" absl-py sounddevice matplotlib opencv-python pyserial</code></pre>
   </li>
   <li><strong>Kamera öffnet nicht:</strong> macOS-Kamera-Berechtigung fürs Terminal prüfen (Systemeinstellungen → Datenschutz &amp; Sicherheit → Kamera).</li>
   <li><strong>Maqueen bewegt sich gar nicht:</strong> Prüfen, ob der Maqueen eingeschaltet ist (eigener Ein/Aus-Schalter am Board, unabhängig vom micro:bit) und ob der micro:bit richtig in den Sockel gesteckt ist.</li>
