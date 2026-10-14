@@ -216,6 +216,17 @@ angezeigte Winkel hilft dabei, einen guten Schwellenwert zu finden.
 > aktivierten `.venv` einmal ausführen: `pip install "mediapipe==0.10.14"`
 > und `gesture_reader.py` erneut starten.
 
+> **`pip install -r requirements.txt` bricht ab mit
+> `Could not find a version that satisfies the requirement jaxlib`?**
+> mediapipe verlangt zwingend `jax`/`jaxlib` als Abhängigkeit, obwohl
+> dieses Skript das gar nicht nutzt (nur die klassische
+> `mp.solutions.hands`-Schnittstelle) - auf manchen Macs gibt es dafür
+> gerade kein passendes Paket. Workaround in der aktivierten `.venv`:
+> ```bash
+> pip install --no-deps mediapipe==0.10.14
+> pip install numpy attrs flatbuffers "protobuf>=4.25.3,<5" absl-py sounddevice opencv-python pyserial
+> ```
+
 ### Schritt 2: BitBot XL per Funk ansteuern
 
 Der BitBot XL soll frei fahren (batteriebetrieben) – ein USB-Kabel vom

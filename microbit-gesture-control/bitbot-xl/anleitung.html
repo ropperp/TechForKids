@@ -153,6 +153,11 @@ pip install -r requirements.txt</code></pre>
 <ul>
   <li><strong>Port nicht gefunden / falscher Port:</strong> micro:bit neu einstecken, erneut <code>--list-ports</code> ausführen – der Portname kann sich je nach USB-Anschluss ändern.</li>
   <li><strong><code>mediapipe</code> Fehler beim Start:</strong> <code>pip install "mediapipe==0.10.14"</code> in der aktivierten <code>.venv</code> ausführen.</li>
+  <li><strong><code>pip install -r requirements.txt</code> bricht ab mit "<code>Could not find a version that satisfies the requirement jaxlib</code>":</strong>
+    mediapipe verlangt <code>jax</code>/<code>jaxlib</code>, obwohl unser Skript das gar nicht braucht - auf manchen Macs gibt es dafür gerade kein passendes Paket. Workaround in der aktivierten <code>.venv</code>:
+    <pre><code>pip install --no-deps mediapipe==0.10.14
+pip install numpy attrs flatbuffers "protobuf>=4.25.3,&lt;5" absl-py sounddevice opencv-python pyserial</code></pre>
+  </li>
   <li><strong>Kamera öffnet nicht:</strong> macOS-Kamera-Berechtigung fürs Terminal prüfen (Systemeinstellungen → Datenschutz &amp; Sicherheit → Kamera).</li>
 </ul>
 
