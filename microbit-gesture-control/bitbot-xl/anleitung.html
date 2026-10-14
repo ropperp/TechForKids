@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BitBot XL – Anleitung</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5b6270;
+    --card: #f4f6f8;
+    --border: #d8dee6;
+    --accent: #1b6fd1;
+    --code-bg: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171c;
+      --fg: #e8eaed;
+      --muted: #9aa4b2;
+      --card: #1c2128;
+      --border: #30363d;
+      --accent: #6fb1ff;
+      --code-bg: #0e1116;
+    }
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    max-width: 760px;
+    margin: 2rem auto;
+    padding: 0 1.2rem 3rem;
+    line-height: 1.55;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); margin-top: 0; margin-bottom: 1.6rem; }
+  h2 {
+    font-size: 1.1rem;
+    margin-top: 2rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    white-space: pre;
+  }
+  .steps { padding-left: 1.3rem; }
+  .steps > li { margin-bottom: 1rem; }
+  code {
+    background: var(--code-bg);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    font-size: 0.95rem;
+  }
+  th { background: var(--card); }
+  .files { list-style: none; padding-left: 0; }
+  .files li { margin-bottom: 0.4rem; }
+  .files .path { font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 600; }
+  .note {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>🤖 BitBot XL – Gestensteuerung</h1>
+<p class="subtitle">Kurzanleitung zum Einrichten und Starten. Für Hintergründe/Troubleshooting siehe die <code>README.md</code> im übergeordneten Ordner.</p>
+
+<h2>Wie das Ganze zusammenspielt</h2>
+<div class="diagram">Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
+┌────────────────┐  USB   ┌────────────────┐ Funk  ┌───────────────────┐
+│ gesture_reader  │ ─────▶ │ funkt Kommando  │ ────▶ │ steuert Motoren,   │
+│ .py             │ Kabel  │ weiter          │       │ Lichter, Lautspr.  │
+└────────────────┘        └────────────────┘        └───────────────────┘</div>
+
+<h2>Welche Datei gehört wohin?</h2>
+<ul class="files">
+  <li><span class="path">gesture_reader.py</span> + <span class="path">requirements.txt</span> → läuft als Python-Programm auf dem Mac (Webcam-Erkennung).</li>
+  <li><span class="path">microbit-sender/main.py</span> → auf den micro:bit, der per USB am Mac bleibt.</li>
+  <li><span class="path">microbit-bitbot/main.py</span> → auf den micro:bit, der auf dem BitBot XL sitzt.</li>
+</ul>
+
+<h2>Schritt für Schritt</h2>
+<ol class="steps">
+  <li><strong>Python-Umgebung einrichten</strong> (einmalig, im Terminal in diesem Ordner):
+    <pre><code>python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt</code></pre>
+  </li>
+  <li><strong>Sender-micro:bit flashen:</strong> micro:bit per USB anschließen, auf
+    <a href="https://python.microbit.org" target="_blank" rel="noopener">python.microbit.org</a> öffnen,
+    Inhalt von <code>microbit-sender/main.py</code> einfügen, auf "Flash"/"Send to micro:bit" klicken.
+    Zeigt danach ein Smiley 🙂.
+  </li>
+  <li><strong>BitBot-micro:bit flashen:</strong> den micro:bit, der auf dem BitBot XL sitzt, kurz per USB anschließen,
+    Inhalt von <code>microbit-bitbot/main.py</code> einfügen, flashen. Danach wieder auf den BitBot stecken, Batterien rein.
+  </li>
+  <li><strong>Sender-micro:bit am Mac lassen</strong> und Port herausfinden:
+    <pre><code>python gesture_reader.py --list-ports</code></pre>
+  </li>
+  <li><strong>Starten</strong> (fragt nach Geschwindigkeiten, Enter = Standardwert):
+    <pre><code>python gesture_reader.py --port /dev/tty.usbmodemXXXX</code></pre>
+  </li>
+</ol>
+
+<div class="note">
+  <strong>RADIO_GROUP</strong> (Standard <code>1</code>) muss in <code>microbit-sender/main.py</code> und
+  <code>microbit-bitbot/main.py</code> identisch sein. Mehrere Teams im selben Raum? Jedes Team braucht eine eigene Nummer.
+</div>
+
+<h2>Gesten</h2>
+<table>
+  <tr><th>Geste</th><th>Aktion</th><th>Licht</th></tr>
+  <tr><td>Faust</td><td>Stopp</td><td>aus</td></tr>
+  <tr><td>Zwei Finger ("Peace")</td><td>Rückwärts</td><td>rot + Piepton alle 1s</td></tr>
+  <tr><td>Offene Hand, neutral</td><td>Geradeaus</td><td>grün</td></tr>
+  <tr><td>Offene Hand, nach links/rechts gekippt</td><td>Kurve (kein Drehen auf der Stelle), enger je stärker gekippt</td><td>grün</td></tr>
+  <tr><td>Keine Hand im Bild / Funk weg</td><td>Stopp (Sicherheits-Watchdog, &lt;1s)</td><td>aus</td></tr>
+</table>
+
+<h2>Typische Probleme</h2>
+<ul>
+  <li><strong>Port nicht gefunden / falscher Port:</strong> micro:bit neu einstecken, erneut <code>--list-ports</code> ausführen – der Portname kann sich je nach USB-Anschluss ändern.</li>
+  <li><strong><code>mediapipe</code> Fehler beim Start:</strong> <code>pip install "mediapipe==0.10.14"</code> in der aktivierten <code>.venv</code> ausführen.</li>
+  <li><strong>Kamera öffnet nicht:</strong> macOS-Kamera-Berechtigung fürs Terminal prüfen (Systemeinstellungen → Datenschutz &amp; Sicherheit → Kamera).</li>
+</ul>
+
+</body>
+</html>

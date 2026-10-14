@@ -1,17 +1,23 @@
 # Gestensteuerung für micro:bit
 
-Dieses Projekt enthält zwei Ansätze:
+Dieses Projekt enthält drei Ansätze:
 
 - **`web/`** – Trainiere ein KI-Modell mit [Teachable Machine](https://teachablemachine.withgoogle.com/)
   im Browser und lass einen micro:bit dazu einmalig einen Pfeil
   anzeigen. Kein Python nötig, aber durch die Bild-Erkennung spürbar
   verzögert (1-2 Sekunden) – gut zum Ausprobieren, für eine flüssige
   **Echtzeit-Robotersteuerung** aber zu langsam.
-- **`hand-control/`** – Schnelle, trainingsfreie Erkennung per
+- **`bitbot-xl/`** – Schnelle, trainingsfreie Erkennung per
   Hand-Landmarken (Faust = Stopp, Hand nach links/rechts gekippt =
   Lenken, neutral = geradeaus) in Python. Reagiert praktisch ohne
-  Verzögerung und ist der Ausgangspunkt für die Steuerung des
-  **BitBot XL**. Siehe Abschnitt weiter unten.
+  Verzögerung und steuert einen **4tronix BitBot XL** über Funk an.
+  Siehe Abschnitt weiter unten, oder die Kurzanleitung
+  `bitbot-xl/anleitung.html`.
+- **`maqueen-plus-v2/`** – Dieselbe Gestensteuerung, aber für einen
+  **DFRobot Maqueen Plus V2**. `gesture_reader.py` und der
+  Sender-micro:bit sind identisch zu `bitbot-xl/`, nur die
+  Motoransteuerung im micro:bit-Code unterscheidet sich (I2C statt
+  einzelner Pins). Siehe `maqueen-plus-v2/anleitung.html`.
 
 ## Ansatz 1: Teachable Machine → micro:bit (`web/`)
 
@@ -137,7 +143,8 @@ geschrieben sein.
   zwischen Vorhersagen) feinjustieren – kleinere Werte reagieren
   schneller, sind aber anfälliger für kurze Fehlerkennungen. Für eine
   **spürbar** schnellere, quasi verzögerungsfreie Steuerung (z.B. für
-  einen Roboter) nutze stattdessen `hand-control/` (siehe unten).
+  einen Roboter) nutze stattdessen `bitbot-xl/` oder `maqueen-plus-v2/`
+  (siehe unten).
 - **Nach neuem Training ändert sich nichts** → Falls dein Teachable-
   Machine-Link nach dem Re-Upload gleich bleibt, holt die Seite sich
   Modell und Metadaten inzwischen bewusst ohne Browser-Cache
@@ -150,11 +157,14 @@ geschrieben sein.
   `oben`/`unten`/`nichts`). Den dort angezeigten Klassennamen einfach 1:1
   in `GESTURE_CONFIG` in `web/app.js` ergänzen.
 
-## Ansatz 2: Schnelle Handgesten-Erkennung für den BitBot XL (`hand-control/`)
+## Ansatz 2: Schnelle Handgesten-Erkennung für den BitBot XL (`bitbot-xl/`)
+
+> Kurzanleitung zum schnellen Nachschlagen: `bitbot-xl/anleitung.html`
+> (im Browser öffnen).
 
 Für eine **flüssige Echtzeit-Robotersteuerung** ist ein Bild-Klassifizierer
 wie Teachable Machine zu langsam (jedes Bild muss komplett durch ein
-neuronales Netz). Stattdessen nutzt `hand-control/` **Hand-Landmarken**
+neuronales Netz). Stattdessen nutzt `bitbot-xl/` **Hand-Landmarken**
 (21 Punkte an Handgelenk/Fingern, per [MediaPipe](https://developers.google.com/mediapipe)) –
 reine Geometrie-Rechnung, kein Training nötig, reagiert praktisch ohne
 Verzögerung.
@@ -181,7 +191,7 @@ Noch **ohne** micro:bit/BitBot-Anbindung – zum Ausprobieren und
 Feinjustieren der Erkennung:
 
 ```bash
-cd hand-control
+cd bitbot-xl
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -228,14 +238,14 @@ Webcam (Mac, Python)      Sender-micro:bit         BitBot-micro:bit
 > Standard-WS2812/NeoPixel-Format).
 
 **1. Zweiten micro:bit als "Sender" aufspielen** (bleibt per USB am Mac):
-   - Inhalt von `hand-control/microbit-sender/main.py` im
+   - Inhalt von `bitbot-xl/microbit-sender/main.py` im
      [Python-Editor](https://python.microbit.org) öffnen und auf den micro:bit
      flashen.
 
 **2. micro:bit auf dem BitBot XL aufspielen:**
    - Diesen micro:bit **kurz per USB an den Mac anschließen** (nur zum
      Programmieren, danach wieder auf den BitBot stecken).
-   - Inhalt von `hand-control/microbit-bitbot/main.py` im Python-Editor
+   - Inhalt von `bitbot-xl/microbit-bitbot/main.py` im Python-Editor
      öffnen und auf diesen micro:bit flashen.
    - micro:bit wieder auf den BitBot XL stecken, BitBot einschalten
      (Batterien). Er zeigt ein Smiley 🙂 sobald er bereit ist.
@@ -275,3 +285,62 @@ Rads bei der engsten Kurve (je kleiner, desto enger die Kurve).
 Die LED-Helligkeit (`LED_BRIGHTNESS`, 0-255) lässt sich am Kopf von
 `microbit-bitbot/main.py` anpassen, falls 12 LEDs auf voller Helligkeit
 zu grell sind oder zu viel Strom ziehen.
+
+## Ansatz 3: Dieselbe Gestensteuerung für den Maqueen Plus V2 (`maqueen-plus-v2/`)
+
+> Kurzanleitung zum schnellen Nachschlagen: `maqueen-plus-v2/anleitung.html`
+> (im Browser öffnen).
+
+Gleiche Idee wie bei `bitbot-xl/`, nur für einen **DFRobot Maqueen Plus
+V2** statt den BitBot XL. `gesture_reader.py`, `requirements.txt` und
+`microbit-sender/main.py` sind **identisch** zur BitBot-XL-Version
+(reiner Kopie) – die Handgesten-Erkennung und das Funkprotokoll sind
+roboterunabhängig, nur die eigentliche Motoransteuerung unterscheidet
+sich:
+
+```
+Webcam (Mac, Python)      Sender-micro:bit         Maqueen-micro:bit
+┌────────────────┐  USB   ┌────────────────┐ Funk  ┌───────────────────┐
+│ gesture_reader  │ ─────▶ │ funkt Kommando  │ ────▶ │ steuert Motoren    │
+│ .py             │ Kabel  │ weiter          │       │ per I2C an         │
+└────────────────┘        └────────────────┘        └───────────────────┘
+```
+
+> Hinweis: Auch DFRobot bietet für den Maqueen Plus V2 nur eine
+> MakeCode/JavaScript-Bibliothek an (`pxt-DFRobot_MaqueenPlus_v20`),
+> keine fertige MicroPython-Bibliothek. `microbit-maqueen/main.py`
+> spricht den eingebauten Motor-Controller deshalb direkt per I2C an
+> (Adresse `0x10`, Register `0x00`/`0x02` für die Motoren, `11`/`12`
+> für die eingebauten Lichter - Werte aus dem offiziellen DFRobot-
+> Quellcode entnommen). Im Gegensatz zum BitBot XL gibt es hier also
+> keine einzelnen Motor-Pins. Der Maqueen versteht außerdem nur
+> Geschwindigkeiten von 0-255 statt 0-1023 - das rechnet
+> `microbit-maqueen/main.py` selbst um, `gesture_reader.py` bleibt
+> unverändert.
+
+**1. Zweiten micro:bit als "Sender" aufspielen** (bleibt per USB am Mac):
+   - Inhalt von `maqueen-plus-v2/microbit-sender/main.py` im
+     [Python-Editor](https://python.microbit.org) öffnen und auf den micro:bit
+     flashen.
+
+**2. micro:bit im Maqueen Plus V2 aufspielen:**
+   - Diesen micro:bit **kurz per USB an den Mac anschließen** (nur zum
+     Programmieren, danach wieder in den Maqueen stecken).
+   - Inhalt von `maqueen-plus-v2/microbit-maqueen/main.py` im
+     Python-Editor öffnen und auf diesen micro:bit flashen.
+   - micro:bit wieder in den Maqueen stecken, einschalten. Er zeigt ein
+     Smiley 🙂 sobald er bereit ist.
+
+**3. gesture_reader.py mit dem Sender-micro:bit verbinden:**
+   - Sender-micro:bit (aus Schritt 1) per USB am Mac lassen.
+   - Port herausfinden: `python gesture_reader.py --list-ports`
+   - Starten: `python gesture_reader.py --port /dev/tty.usbmodemXXXX`
+
+**4. Ausprobieren:** Gleiche Gesten wie beim BitBot XL (Faust = Stopp,
+zwei Finger = rückwärts, offene Hand neutral = geradeaus, gekippt =
+Kurve), gleiches Lichter-/Ton-Verhalten (grün beim Fahren, rot + Piepton
+beim Rückwärtsfahren, Sicherheits-Watchdog bei Funkausfall).
+
+**Wichtig:** `RADIO_GROUP` (Standard `1`) muss in
+`microbit-sender/main.py` und `microbit-maqueen/main.py` identisch
+sein.

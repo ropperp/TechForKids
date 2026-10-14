@@ -6,11 +6,11 @@ Bleibt per USB-Kabel mit dem Mac verbunden. Empfängt Kommandos von
 gesture_reader.py über die USB-Serielle-Verbindung und funkt sie an
 den micro:bit auf dem BitBot XL weiter (siehe ../microbit-bitbot/main.py).
 
-Ein Kommando hat das Format "<Richtung><4-stellige Geschwindigkeit>",
-z.B. "L0150" oder "V0600", abgeschlossen mit einem Zeilenumbruch. Da
-die USB-Verbindung ein Bytestrom ohne feste Nachrichtengrenzen ist,
-wird hier zeilenweise gepuffert (bis "\\n") und erst dann komplett per
-Funk weitergeschickt.
+Ein Kommando hat das Format "<Modus>,<linkes Rad>,<rechtes Rad>",
+z.B. "L,150,600" oder "B,-400,-400", abgeschlossen mit einem
+Zeilenumbruch. Da die USB-Verbindung ein Bytestrom ohne feste
+Nachrichtengrenzen ist, wird hier zeilenweise gepuffert (bis "\\n")
+und erst dann komplett per Funk weitergeschickt.
 
 WICHTIG: RADIO_GROUP muss exakt mit microbit-bitbot/main.py
 übereinstimmen, sonst hört der BitBot nicht mit!
