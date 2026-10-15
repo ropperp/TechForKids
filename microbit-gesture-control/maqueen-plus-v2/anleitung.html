@@ -167,6 +167,10 @@ pip install numpy attrs flatbuffers "protobuf>=4.25.3,&lt;5" absl-py sounddevice
   </li>
   <li><strong>Kamera öffnet nicht:</strong> macOS-Kamera-Berechtigung fürs Terminal prüfen (Systemeinstellungen → Datenschutz &amp; Sicherheit → Kamera).</li>
   <li><strong>Maqueen bewegt sich gar nicht:</strong> Prüfen, ob der Maqueen eingeschaltet ist (eigener Ein/Aus-Schalter am Board, unabhängig vom micro:bit) und ob der micro:bit richtig in den Sockel gesteckt ist.</li>
+  <li><strong><code>OSError: [Errno 19] ENODEV</code> direkt auf dem micro:bit (im Python-Editor sichtbar):</strong>
+    Der micro:bit findet über I2C keinen Maqueen-Motor-Controller - meist weil er beim Hochladen noch per USB am Mac
+    steckte statt im Maqueen, oder der Maqueen ausgeschaltet war. micro:bit fest in den Maqueen stecken, Maqueen
+    einschalten, dann läuft es von selbst weiter (das Programm fängt diesen Fehler jetzt ab, statt abzustürzen).</li>
 </ul>
 
 </body>

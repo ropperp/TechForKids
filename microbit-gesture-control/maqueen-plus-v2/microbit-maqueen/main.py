@@ -76,11 +76,22 @@ def scale_speed(speed):
     return scaled
 
 
+def i2c_write(data):
+    # Falls der micro:bit (noch) nicht im Maqueen steckt oder der Maqueen
+    # ausgeschaltet ist, antwortet auf dem I2C-Bus niemand -> OSError
+    # (z.B. ENODEV). Das soll das Programm nicht abstürzen lassen,
+    # einfach überspringen und beim nächsten Versuch neu probieren.
+    try:
+        i2c.write(I2C_ADDR, data)
+    except OSError:
+        pass
+
+
 def set_motor(register, speed):
     speed = scale_speed(speed)
     direction = 0 if speed >= 0 else 1
     magnitude = abs(speed)
-    i2c.write(I2C_ADDR, bytes([register, direction, magnitude]))
+    i2c_write(bytes([register, direction, magnitude]))
 
 
 def drive(left_speed, right_speed):
@@ -93,8 +104,8 @@ def stop():
 
 
 def set_lights(color):
-    i2c.write(I2C_ADDR, bytes([LEFT_LIGHT_REG, color]))
-    i2c.write(I2C_ADDR, bytes([RIGHT_LIGHT_REG, color]))
+    i2c_write(bytes([LEFT_LIGHT_REG, color]))
+    i2c_write(bytes([RIGHT_LIGHT_REG, color]))
 
 
 DISPLAY_IMAGES = {
