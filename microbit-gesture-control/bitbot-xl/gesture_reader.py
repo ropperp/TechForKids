@@ -68,13 +68,14 @@ FIST_MAX_EXTENDED = 1         # so viele gestreckte Finger gelten noch als Faust
 REVERSE_EXTENDED = 2          # so viele gestreckte Finger gelten als "Rückwärts"-Geste
 ROTATION_THRESHOLD_DEG = 20   # ab dieser Neigung (in Grad) gilt die Hand als "gekippt"
 MAX_TILT_ANGLE_DEG = 60       # ab dieser Neigung ist die Kurve am engsten
+RESPONSE_CURVE = 0.4          # <1 = reagiert schon bei mittlerer Kippung stark, 1 = linear
 STABLE_FRAMES = 3             # so viele Frames hintereinander für eine stabile Erkennung
 HEARTBEAT_INTERVAL_S = 0.3    # aktuelles Kommando spätestens alle X Sekunden erneut senden
 
 # Standard-Geschwindigkeiten (0-1023), können beim Start angepasst werden
 DEFAULT_FORWARD_SPEED = 600
 DEFAULT_REVERSE_SPEED = 400
-DEFAULT_MIN_INNER_SPEED = 150  # Geschwindigkeit des kurveninneren Rads bei enger Kurve
+DEFAULT_MIN_INNER_SPEED = 0   # Geschwindigkeit des kurveninneren Rads bei enger Kurve
 
 FINGER_TIPS = [8, 12, 16, 20]  # Zeige-, Mittel-, Ring-, kleiner Finger
 FINGER_MCPS = [5, 9, 13, 17]   # jeweilige Grundgelenke (Knöchel)
@@ -135,12 +136,20 @@ def classify(landmarks, w, h):
 
 def inner_wheel_speed(angle, forward_speed, min_speed):
     """Geschwindigkeit des kurveninneren Rads: nahe forward_speed bei leichter
-    Kippung (weiter Bogen), sinkt bis min_speed bei starker Kippung (enge Kurve)."""
+    Kippung (weiter Bogen), sinkt bis min_speed bei starker Kippung (enge Kurve).
+
+    Die Kennlinie ist bewusst nicht linear, sondern reagiert schon bei
+    mittlerer Kippung stark (RESPONSE_CURVE < 1 macht die Kurve am Anfang
+    steiler) - manche Motoren brauchen einen deutlichen Geschwindigkeits-
+    unterschied, bevor sich überhaupt etwas sichtbar dreht (Losbrechmoment),
+    eine rein lineare Rampe würde sich dann erst kurz vor der Extremstellung
+    bemerkbar machen."""
     if angle is None:
         return forward_speed
     magnitude = min(abs(angle), MAX_TILT_ANGLE_DEG)
     span = MAX_TILT_ANGLE_DEG - ROTATION_THRESHOLD_DEG
     ratio = max(0.0, (magnitude - ROTATION_THRESHOLD_DEG) / span) if span > 0 else 1.0
+    ratio = ratio ** RESPONSE_CURVE
     return int(round(forward_speed - ratio * (forward_speed - min_speed)))
 
 
