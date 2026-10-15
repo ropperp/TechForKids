@@ -96,6 +96,7 @@ def set_motor(register, speed):
 
 def drive(left_speed, right_speed):
     set_motor(LEFT_MOTOR_REG, left_speed)
+    sleep(5)  # kurze Pause, damit der zweite I2C-Schreibvorgang nicht verschluckt wird
     set_motor(RIGHT_MOTOR_REG, right_speed)
 
 
